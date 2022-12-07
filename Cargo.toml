@@ -1,4 +1,4 @@
 [workspace]
 members = [
-    "curve_similarity_toy",
+    "rs_lib"
 ]
