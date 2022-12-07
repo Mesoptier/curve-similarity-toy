@@ -1,0 +1,11 @@
+{
+  "name": "curve-similarity-toy",
+  "packageManager": "yarn@3.3.0",
+  "scripts": {
+    "build": "esbuild src/main.ts --bundle --outdir=www/build",
+    "serve": "yarn build --servedir=www"
+  },
+  "devDependencies": {
+    "esbuild": "^0.16.1"
+  }
+}
