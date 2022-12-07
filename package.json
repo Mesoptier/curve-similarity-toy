@@ -2,8 +2,10 @@
   "name": "curve-similarity-toy",
   "packageManager": "yarn@3.3.0",
   "scripts": {
-    "build": "esbuild src/main.ts --bundle --outdir=www/build",
-    "serve": "yarn build --servedir=www"
+    "build:wasm": "wasm-pack build rs_lib --target web",
+    "build": "node build.mjs",
+    "watch": "yarn build --watch",
+    "serve": "esbuild --servedir=www"
   },
   "devDependencies": {
     "esbuild": "^0.16.1"
