@@ -1,0 +1,4 @@
+[workspace]
+members = [
+    "curve_similarity_toy",
+]
