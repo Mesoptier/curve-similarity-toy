@@ -48,17 +48,37 @@ pub fn start(
     const FLOATS_PER_COLOR: i32 = 3;
     const FLOATS_PER_VERTEX: i32 = FLOATS_PER_POSITION + FLOATS_PER_COLOR;
 
-    let vertices = [
-        // vertex 1
-        -0.7, -0.7, // a_position
-        1.0, 0.0, 0.0, // a_color
-        // vertex 2
-        0.7, -0.7, // a_position
-        0.0, 1.0, 0.0, // a_color
-        // vertex 1
-        0.0, 0.7, // a_position
-        0.0, 0.0, 1.0, // a_color
-    ];
+    fn f(x: f32, y: f32) -> f32 {
+        (x.powi(2) + y.powi(2)) / 2.0
+    }
+
+    // TODO: Render using triangle strips instead
+    let mut vertices = vec![];
+
+    const STEPS: usize = 100;
+    const CELL_SIZE: f32 = 2.0 / (STEPS as f32);
+
+    for x_step in 0..STEPS {
+        let x: f32 = (x_step as f32 / STEPS as f32) * 2.0 - 1.0;
+
+        for y_step in 0..STEPS {
+            let y: f32 = (y_step as f32 / STEPS as f32) * 2.0 - 1.0;
+
+            vertices.extend([x, y]);
+            vertices.extend([f(x, y), 0.0, 0.0]);
+            vertices.extend([x + CELL_SIZE, y]);
+            vertices.extend([f(x + CELL_SIZE, y), 0.0, 0.0]);
+            vertices.extend([x, y + CELL_SIZE]);
+            vertices.extend([f(x, y + CELL_SIZE), 0.0, 0.0]);
+
+            vertices.extend([x + CELL_SIZE, y + CELL_SIZE]);
+            vertices.extend([f(x + CELL_SIZE, y + CELL_SIZE), 0.0, 0.0]);
+            vertices.extend([x + CELL_SIZE, y]);
+            vertices.extend([f(x + CELL_SIZE, y), 0.0, 0.0]);
+            vertices.extend([x, y + CELL_SIZE]);
+            vertices.extend([f(x, y + CELL_SIZE), 0.0, 0.0]);
+        }
+    }
 
     let position_attribute =
         context.get_attrib_location(&program, "a_position");
