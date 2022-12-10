@@ -49,7 +49,7 @@ pub fn start(
     const FLOATS_PER_VERTEX: i32 = FLOATS_PER_POSITION + FLOATS_PER_COLOR;
 
     fn f(x: f32, y: f32) -> f32 {
-        (x.powi(2) + y.powi(2)) / 2.0
+        ((x * y * 10.0).sin() + 1.0) / 2.0
     }
 
     // TODO: Render using triangle strips instead
