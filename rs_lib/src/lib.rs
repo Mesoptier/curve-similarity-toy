@@ -48,8 +48,17 @@ pub fn start(
     const FLOATS_PER_COLOR: i32 = 3;
     const FLOATS_PER_VERTEX: i32 = FLOATS_PER_POSITION + FLOATS_PER_COLOR;
 
+    /// The function to plot
     fn f(x: f32, y: f32) -> f32 {
         ((x * y * 10.0).sin() + 1.0) / 2.0
+    }
+
+    /// Maps from t in [0, 1] to the color that should be rendered
+    fn c(t: f32) -> [f32; 3] {
+        // TODO: This exposes a path on the local filesystem in the compiled WASM
+        let gradient = palette::gradient::named::PLASMA;
+        let color = gradient.get(t);
+        [color.red, color.green, color.blue]
     }
 
     // TODO: Render using triangle strips instead
@@ -65,18 +74,18 @@ pub fn start(
             let y: f32 = (y_step as f32 / STEPS as f32) * 2.0 - 1.0;
 
             vertices.extend([x, y]);
-            vertices.extend([f(x, y), 0.0, 0.0]);
+            vertices.extend(c(f(x, y)));
             vertices.extend([x + CELL_SIZE, y]);
-            vertices.extend([f(x + CELL_SIZE, y), 0.0, 0.0]);
+            vertices.extend(c(f(x + CELL_SIZE, y)));
             vertices.extend([x, y + CELL_SIZE]);
-            vertices.extend([f(x, y + CELL_SIZE), 0.0, 0.0]);
+            vertices.extend(c(f(x, y + CELL_SIZE)));
 
             vertices.extend([x + CELL_SIZE, y + CELL_SIZE]);
-            vertices.extend([f(x + CELL_SIZE, y + CELL_SIZE), 0.0, 0.0]);
+            vertices.extend(c(f(x + CELL_SIZE, y + CELL_SIZE)));
             vertices.extend([x + CELL_SIZE, y]);
-            vertices.extend([f(x + CELL_SIZE, y), 0.0, 0.0]);
+            vertices.extend(c(f(x + CELL_SIZE, y)));
             vertices.extend([x, y + CELL_SIZE]);
-            vertices.extend([f(x, y + CELL_SIZE), 0.0, 0.0]);
+            vertices.extend(c(f(x, y + CELL_SIZE)));
         }
     }
 
