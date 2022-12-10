@@ -105,10 +105,10 @@ pub fn start(
         )
     }
 
-    let vbo = context
+    let vao = context
         .create_vertex_array()
         .ok_or("Could not create vertex array object")?;
-    context.bind_vertex_array(Some(&vbo));
+    context.bind_vertex_array(Some(&vao));
 
     // Bind attributes
     context.vertex_attrib_pointer_with_i32(
@@ -136,7 +136,7 @@ pub fn start(
     context.clear(WebGl2RenderingContext::COLOR_BUFFER_BIT);
 
     let vert_count = (vertices.len() / 2) as i32;
-    context.bind_vertex_array(Some(&vbo));
+    context.bind_vertex_array(Some(&vao));
     context.draw_arrays(WebGl2RenderingContext::TRIANGLES, 0, vert_count);
 
     context.bind_vertex_array(None);
