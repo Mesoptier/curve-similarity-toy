@@ -61,46 +61,55 @@ pub fn start(
         [color.red, color.green, color.blue]
     }
 
-    // TODO: Render using triangle strips instead
-    let mut vertices = vec![];
+    let x_len = 100;
+    let y_len = 100;
 
-    const STEPS: usize = 100;
-    const CELL_SIZE: f32 = 2.0 / (STEPS as f32);
+    // TODO: Use Vec::with_capacity
+    let mut vertex_data: Vec<f32> = vec![];
+    let mut index_data: Vec<u16> = vec![];
 
-    for x_step in 0..STEPS {
-        let x: f32 = (x_step as f32 / STEPS as f32) * 2.0 - 1.0;
-
-        for y_step in 0..STEPS {
-            let y: f32 = (y_step as f32 / STEPS as f32) * 2.0 - 1.0;
-
-            vertices.extend([x, y]);
-            vertices.extend(c(f(x, y)));
-            vertices.extend([x + CELL_SIZE, y]);
-            vertices.extend(c(f(x + CELL_SIZE, y)));
-            vertices.extend([x, y + CELL_SIZE]);
-            vertices.extend(c(f(x, y + CELL_SIZE)));
-
-            vertices.extend([x + CELL_SIZE, y + CELL_SIZE]);
-            vertices.extend(c(f(x + CELL_SIZE, y + CELL_SIZE)));
-            vertices.extend([x + CELL_SIZE, y]);
-            vertices.extend(c(f(x + CELL_SIZE, y)));
-            vertices.extend([x, y + CELL_SIZE]);
-            vertices.extend(c(f(x, y + CELL_SIZE)));
+    // Build vertex data
+    for y_idx in 0..y_len {
+        for x_idx in 0..x_len {
+            let x: f32 = (x_idx as f32 / (x_len - 1) as f32) * 2.0 - 1.0;
+            let y: f32 = (y_idx as f32 / (y_len - 1) as f32) * 2.0 - 1.0;
+            vertex_data.extend([x, y]);
+            vertex_data.extend(c(f(x, y)));
         }
     }
 
-    let position_attribute =
-        context.get_attrib_location(&program, "a_position");
-    let color_attribute = context.get_attrib_location(&program, "a_color");
+    // Build index data
+    for y in 0..(y_len - 1) {
+        if y > 0 {
+            // Degenerate begin: repeat first vertex
+            index_data.push((y * x_len) as u16);
+        }
 
-    let buffer = context.create_buffer().ok_or("Failed to create buffer")?;
-    context.bind_buffer(WebGl2RenderingContext::ARRAY_BUFFER, Some(&buffer));
+        for x in 0..x_len {
+            index_data.push(((y * x_len) + x) as u16);
+            index_data.push((((y + 1) * x_len) + x) as u16);
+        }
+
+        if y < y_len - 2 {
+            // Degenerate end: repeat last vertex
+            index_data.push((((y + 1) * x_len) + (x_len - 1)) as u16);
+        }
+    }
+
+    // Create vertex buffer
+    let vertex_buffer =
+        context.create_buffer().ok_or("Failed to create buffer")?;
+    context.bind_buffer(
+        WebGl2RenderingContext::ARRAY_BUFFER,
+        Some(&vertex_buffer),
+    );
 
     unsafe {
-        let vertices_array_buf_view = js_sys::Float32Array::view(&vertices);
+        let vertex_data_array_buf_view =
+            js_sys::Float32Array::view(&vertex_data);
         context.buffer_data_with_array_buffer_view(
             WebGl2RenderingContext::ARRAY_BUFFER,
-            &vertices_array_buf_view,
+            &vertex_data_array_buf_view,
             WebGl2RenderingContext::STATIC_DRAW,
         )
     }
@@ -110,34 +119,60 @@ pub fn start(
         .ok_or("Could not create vertex array object")?;
     context.bind_vertex_array(Some(&vao));
 
+    // Create index buffer
+    let index_buffer =
+        context.create_buffer().ok_or("Failed to create buffer")?;
+    context.bind_buffer(
+        WebGl2RenderingContext::ELEMENT_ARRAY_BUFFER,
+        Some(&index_buffer),
+    );
+
+    unsafe {
+        let index_data_array_buf_view = js_sys::Uint16Array::view(&index_data);
+        context.buffer_data_with_array_buffer_view(
+            WebGl2RenderingContext::ELEMENT_ARRAY_BUFFER,
+            &index_data_array_buf_view,
+            WebGl2RenderingContext::STATIC_DRAW,
+        )
+    }
+
     // Bind attributes
+    let position_attribute =
+        context.get_attrib_location(&program, "a_position") as u32;
+    let color_attribute =
+        context.get_attrib_location(&program, "a_color") as u32;
+
     context.vertex_attrib_pointer_with_i32(
-        position_attribute as u32,
+        position_attribute,
         FLOATS_PER_POSITION,
         WebGl2RenderingContext::FLOAT,
         false,
         FLOATS_PER_VERTEX * BYTES_PER_FLOAT,
         0,
     );
-    context.enable_vertex_attrib_array(position_attribute as u32);
+    context.enable_vertex_attrib_array(position_attribute);
 
     context.vertex_attrib_pointer_with_i32(
-        color_attribute as u32,
+        color_attribute,
         FLOATS_PER_COLOR,
         WebGl2RenderingContext::FLOAT,
         false,
         FLOATS_PER_VERTEX * BYTES_PER_FLOAT,
         FLOATS_PER_POSITION * BYTES_PER_FLOAT,
     );
-    context.enable_vertex_attrib_array(color_attribute as u32);
+    context.enable_vertex_attrib_array(color_attribute);
 
     // Draw
     context.clear_color(0.0, 0.0, 0.0, 1.0);
     context.clear(WebGl2RenderingContext::COLOR_BUFFER_BIT);
 
-    let vert_count = (vertices.len() / 2) as i32;
     context.bind_vertex_array(Some(&vao));
-    context.draw_arrays(WebGl2RenderingContext::TRIANGLES, 0, vert_count);
+    context.draw_elements_with_i32(
+        WebGl2RenderingContext::TRIANGLE_STRIP,
+        index_data.len() as i32,
+        WebGl2RenderingContext::UNSIGNED_SHORT,
+        0,
+    );
 
     context.bind_vertex_array(None);
 
