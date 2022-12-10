@@ -8,6 +8,7 @@
     "serve": "esbuild --servedir=www"
   },
   "devDependencies": {
-    "esbuild": "^0.16.1"
+    "esbuild": "^0.16.1",
+    "typescript": "^4.9.4"
   }
 }
