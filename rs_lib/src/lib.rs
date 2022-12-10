@@ -12,10 +12,13 @@ pub fn start(
         WebGl2RenderingContext::VERTEX_SHADER,
         r##"#version 300 es
 
-        in vec4 position;
+        in vec4 a_position;
+        in vec4 a_color;
+        out vec4 v_color;
 
         void main() {
-            gl_Position = position;
+            v_color = a_color;
+            gl_Position = a_position;
         }
         "##,
     )?;
@@ -26,10 +29,12 @@ pub fn start(
         r##"#version 300 es
 
         precision highp float;
-        out vec4 outColor;
+
+        in vec4 v_color;
+        out vec4 out_color;
 
         void main() {
-            outColor = vec4(1, 1, 0.5, 1);
+            out_color = v_color;
         }
         "##,
     )?;
@@ -37,44 +42,75 @@ pub fn start(
     let program = link_program(&context, &vert_shader, &frag_shader)?;
     context.use_program(Some(&program));
 
-    let vertices: [f32; 6] = [-0.7, -0.7, 0.7, -0.7, 0.0, 0.7];
+    const BYTES_PER_FLOAT: i32 = 4;
 
-    let position_attribute_location =
-        context.get_attrib_location(&program, "position");
+    const FLOATS_PER_POSITION: i32 = 2;
+    const FLOATS_PER_COLOR: i32 = 3;
+    const FLOATS_PER_VERTEX: i32 = FLOATS_PER_POSITION + FLOATS_PER_COLOR;
+
+    let vertices = [
+        // vertex 1
+        -0.7, -0.7, // a_position
+        1.0, 0.0, 0.0, // a_color
+        // vertex 2
+        0.7, -0.7, // a_position
+        0.0, 1.0, 0.0, // a_color
+        // vertex 1
+        0.0, 0.7, // a_position
+        0.0, 0.0, 1.0, // a_color
+    ];
+
+    let position_attribute =
+        context.get_attrib_location(&program, "a_position");
+    let color_attribute = context.get_attrib_location(&program, "a_color");
+
     let buffer = context.create_buffer().ok_or("Failed to create buffer")?;
     context.bind_buffer(WebGl2RenderingContext::ARRAY_BUFFER, Some(&buffer));
 
     unsafe {
-        let positions_array_buf_view = js_sys::Float32Array::view(&vertices);
+        let vertices_array_buf_view = js_sys::Float32Array::view(&vertices);
         context.buffer_data_with_array_buffer_view(
             WebGl2RenderingContext::ARRAY_BUFFER,
-            &positions_array_buf_view,
+            &vertices_array_buf_view,
             WebGl2RenderingContext::STATIC_DRAW,
         )
     }
 
-    let vao = context
+    let vbo = context
         .create_vertex_array()
         .ok_or("Could not create vertex array object")?;
-    context.bind_vertex_array(Some(&vao));
+    context.bind_vertex_array(Some(&vbo));
 
+    // Bind attributes
     context.vertex_attrib_pointer_with_i32(
-        position_attribute_location as u32,
-        2,
+        position_attribute as u32,
+        FLOATS_PER_POSITION,
         WebGl2RenderingContext::FLOAT,
         false,
-        0,
+        FLOATS_PER_VERTEX * BYTES_PER_FLOAT,
         0,
     );
-    context.enable_vertex_attrib_array(position_attribute_location as u32);
+    context.enable_vertex_attrib_array(position_attribute as u32);
+
+    context.vertex_attrib_pointer_with_i32(
+        color_attribute as u32,
+        FLOATS_PER_COLOR,
+        WebGl2RenderingContext::FLOAT,
+        false,
+        FLOATS_PER_VERTEX * BYTES_PER_FLOAT,
+        FLOATS_PER_POSITION * BYTES_PER_FLOAT,
+    );
+    context.enable_vertex_attrib_array(color_attribute as u32);
 
     // Draw
     context.clear_color(0.0, 0.0, 0.0, 1.0);
     context.clear(WebGl2RenderingContext::COLOR_BUFFER_BIT);
 
     let vert_count = (vertices.len() / 2) as i32;
-    context.bind_vertex_array(Some(&vao));
+    context.bind_vertex_array(Some(&vbo));
     context.draw_arrays(WebGl2RenderingContext::TRIANGLES, 0, vert_count);
+
+    context.bind_vertex_array(None);
 
     Ok(())
 }
