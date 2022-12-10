@@ -37,8 +37,7 @@ pub fn start(
     let program = link_program(&context, &vert_shader, &frag_shader)?;
     context.use_program(Some(&program));
 
-    // TODO: These are vec3's (right?), could they just be vec2's instead?
-    let vertices: [f32; 9] = [-0.7, -0.7, 0.0, 0.7, -0.7, 0.0, 0.0, 0.7, 0.0];
+    let vertices: [f32; 6] = [-0.7, -0.7, 0.7, -0.7, 0.0, 0.7];
 
     let position_attribute_location =
         context.get_attrib_location(&program, "position");
@@ -61,7 +60,7 @@ pub fn start(
 
     context.vertex_attrib_pointer_with_i32(
         position_attribute_location as u32,
-        3,
+        2,
         WebGl2RenderingContext::FLOAT,
         false,
         0,
@@ -69,14 +68,12 @@ pub fn start(
     );
     context.enable_vertex_attrib_array(position_attribute_location as u32);
 
-    // TODO: Why is this called a second time?
-    context.bind_vertex_array(Some(&vao));
-
     // Draw
     context.clear_color(0.0, 0.0, 0.0, 1.0);
     context.clear(WebGl2RenderingContext::COLOR_BUFFER_BIT);
 
-    let vert_count = (vertices.len() / 3) as i32;
+    let vert_count = (vertices.len() / 2) as i32;
+    context.bind_vertex_array(Some(&vao));
     context.draw_arrays(WebGl2RenderingContext::TRIANGLES, 0, vert_count);
 
     Ok(())
