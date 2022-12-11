@@ -31,6 +31,8 @@ jobs:
         with:
           node-version: '17'
           cache: 'yarn'
+      - name: Rust Cache 
+        uses: Swatinem/rust-cache@v2.2.0
           
       - name: Install yarn dependencies
         run: yarn install --immutable
