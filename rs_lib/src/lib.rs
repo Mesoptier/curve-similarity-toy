@@ -42,12 +42,6 @@ pub fn start(
     let program = link_program(&context, &vert_shader, &frag_shader)?;
     context.use_program(Some(&program));
 
-    const BYTES_PER_FLOAT: i32 = 4;
-
-    const FLOATS_PER_POSITION: i32 = 2;
-    const FLOATS_PER_COLOR: i32 = 3;
-    const FLOATS_PER_VERTEX: i32 = FLOATS_PER_POSITION + FLOATS_PER_COLOR;
-
     /// The function to plot
     fn f(x: f32, y: f32) -> f32 {
         ((x * y * 10.0).sin() + 1.0) / 2.0
@@ -61,24 +55,32 @@ pub fn start(
         [color.red, color.green, color.blue]
     }
 
+    const BYTES_PER_FLOAT: i32 = 4;
+
+    const FLOATS_PER_POSITION: i32 = 2;
+    const FLOATS_PER_COLOR: i32 = 3;
+    const FLOATS_PER_VERTEX: i32 = FLOATS_PER_POSITION + FLOATS_PER_COLOR;
+
     let x_len = 100;
     let y_len = 100;
 
-    // TODO: Use Vec::with_capacity
-    let mut vertex_data: Vec<f32> = vec![];
-    let mut index_data: Vec<u16> = vec![];
-
     // Build vertex data
+    let vertex_data_len = ((x_len * y_len) * FLOATS_PER_VERTEX) as usize;
+    let mut vertex_data: Vec<f32> = Vec::with_capacity(vertex_data_len);
+
     for y_idx in 0..y_len {
         for x_idx in 0..x_len {
             let x: f32 = (x_idx as f32 / (x_len - 1) as f32) * 2.0 - 1.0;
             let y: f32 = (y_idx as f32 / (y_len - 1) as f32) * 2.0 - 1.0;
-            vertex_data.extend([x, y]);
-            vertex_data.extend(c(f(x, y)));
+            vertex_data.extend([x, y]); // FLOATS_PER_POSITION
+            vertex_data.extend(c(f(x, y))); // FLOATS_PER_COLOR
         }
     }
 
     // Build index data
+    let index_data_len = 2 * (x_len * (y_len - 1) + (y_len - 2)) as usize;
+    let mut index_data: Vec<u16> = Vec::with_capacity(index_data_len);
+
     for y in 0..(y_len - 1) {
         if y > 0 {
             // Degenerate begin: repeat first vertex
