@@ -63,8 +63,7 @@ pub fn start_for_real(
     /// Maps from t in [0, 1] to the color that should be rendered
     fn c(t: f32) -> [f32; 3] {
         // TODO: This exposes a path on the local filesystem in the compiled WASM
-        let gradient = palette::gradient::named::PLASMA;
-        let color = gradient.get(t);
+        let color = palette::gradient::named::PLASMA.get(t);
         [color.red, color.green, color.blue]
     }
 
@@ -85,8 +84,17 @@ pub fn start_for_real(
             for x_idx in 0..x_len {
                 let x: f32 = (x_idx as f32 / (x_len - 1) as f32) * 2.0 - 1.0;
                 let y: f32 = (y_idx as f32 / (y_len - 1) as f32) * 2.0 - 1.0;
-                vertex_data.extend([x, y]); // FLOATS_PER_POSITION
-                vertex_data.extend(c(f(x, y, t))); // FLOATS_PER_COLOR
+
+                let [r, g, b] = c(f(x, y, t));
+
+                // FLOATS_PER_POSITION
+                vertex_data.push(x);
+                vertex_data.push(y);
+
+                // FLOATS_PER_COLOR
+                vertex_data.push(r);
+                vertex_data.push(g);
+                vertex_data.push(b);
             }
         }
 
