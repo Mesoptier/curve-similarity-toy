@@ -1,4 +1,7 @@
+use std::{cell::RefCell, rc::Rc};
+
 use wasm_bindgen::prelude::*;
+use wasm_bindgen::JsCast;
 use web_sys::{WebGl2RenderingContext, WebGlProgram, WebGlShader};
 
 #[wasm_bindgen]
@@ -7,6 +10,8 @@ pub fn start(
     width: u32,
     height: u32,
 ) -> Result<(), JsValue> {
+    let context = context.clone();
+
     let vert_shader = compile_shader(
         &context,
         WebGl2RenderingContext::VERTEX_SHADER,
@@ -43,8 +48,8 @@ pub fn start(
     context.use_program(Some(&program));
 
     /// The function to plot
-    fn f(x: f32, y: f32) -> f32 {
-        ((x * y * 10.0).sin() + 1.0) / 2.0
+    fn f(x: f32, y: f32, t: f32) -> f32 {
+        ((x * y * 10.0 + t).sin() + 1.0) / 2.0
     }
 
     /// Maps from t in [0, 1] to the color that should be rendered
@@ -64,38 +69,44 @@ pub fn start(
     let x_len = 100;
     let y_len = 100;
 
-    // Build vertex data
-    let vertex_data_len = ((x_len * y_len) * FLOATS_PER_VERTEX) as usize;
-    let mut vertex_data: Vec<f32> = Vec::with_capacity(vertex_data_len);
+    fn build_vertex_data(x_len: i32, y_len: i32, t: f32) -> Vec<f32> {
+        let vertex_data_len = ((x_len * y_len) * FLOATS_PER_VERTEX) as usize;
+        let mut vertex_data: Vec<f32> = Vec::with_capacity(vertex_data_len);
 
-    for y_idx in 0..y_len {
-        for x_idx in 0..x_len {
-            let x: f32 = (x_idx as f32 / (x_len - 1) as f32) * 2.0 - 1.0;
-            let y: f32 = (y_idx as f32 / (y_len - 1) as f32) * 2.0 - 1.0;
-            vertex_data.extend([x, y]); // FLOATS_PER_POSITION
-            vertex_data.extend(c(f(x, y))); // FLOATS_PER_COLOR
+        for y_idx in 0..y_len {
+            for x_idx in 0..x_len {
+                let x: f32 = (x_idx as f32 / (x_len - 1) as f32) * 2.0 - 1.0;
+                let y: f32 = (y_idx as f32 / (y_len - 1) as f32) * 2.0 - 1.0;
+                vertex_data.extend([x, y]); // FLOATS_PER_POSITION
+                vertex_data.extend(c(f(x, y, t))); // FLOATS_PER_COLOR
+            }
         }
+
+        vertex_data
     }
 
-    // Build index data
-    let index_data_len = 2 * (x_len * (y_len - 1) + (y_len - 2)) as usize;
-    let mut index_data: Vec<u16> = Vec::with_capacity(index_data_len);
+    fn build_index_data(x_len: i32, y_len: i32) -> Vec<u16> {
+        let index_data_len = 2 * (x_len * (y_len - 1) + (y_len - 2)) as usize;
+        let mut index_data: Vec<u16> = Vec::with_capacity(index_data_len);
 
-    for y in 0..(y_len - 1) {
-        if y > 0 {
-            // Degenerate begin: repeat first vertex
-            index_data.push((y * x_len) as u16);
+        for y in 0..(y_len - 1) {
+            if y > 0 {
+                // Degenerate begin: repeat first vertex
+                index_data.push((y * x_len) as u16);
+            }
+
+            for x in 0..x_len {
+                index_data.push(((y * x_len) + x) as u16);
+                index_data.push((((y + 1) * x_len) + x) as u16);
+            }
+
+            if y < y_len - 2 {
+                // Degenerate end: repeat last vertex
+                index_data.push((((y + 1) * x_len) + (x_len - 1)) as u16);
+            }
         }
 
-        for x in 0..x_len {
-            index_data.push(((y * x_len) + x) as u16);
-            index_data.push((((y + 1) * x_len) + x) as u16);
-        }
-
-        if y < y_len - 2 {
-            // Degenerate end: repeat last vertex
-            index_data.push((((y + 1) * x_len) + (x_len - 1)) as u16);
-        }
+        index_data
     }
 
     // Create vertex buffer
@@ -105,16 +116,6 @@ pub fn start(
         WebGl2RenderingContext::ARRAY_BUFFER,
         Some(&vertex_buffer),
     );
-
-    unsafe {
-        let vertex_data_array_buf_view =
-            js_sys::Float32Array::view(&vertex_data);
-        context.buffer_data_with_array_buffer_view(
-            WebGl2RenderingContext::ARRAY_BUFFER,
-            &vertex_data_array_buf_view,
-            WebGl2RenderingContext::STATIC_DRAW,
-        )
-    }
 
     let vao = context
         .create_vertex_array()
@@ -128,6 +129,9 @@ pub fn start(
         WebGl2RenderingContext::ELEMENT_ARRAY_BUFFER,
         Some(&index_buffer),
     );
+
+    // Build and upload index data
+    let index_data = build_index_data(x_len, y_len);
 
     unsafe {
         let index_data_array_buf_view = js_sys::Uint16Array::view(&index_data);
@@ -164,19 +168,58 @@ pub fn start(
     );
     context.enable_vertex_attrib_array(color_attribute);
 
-    // Draw
-    context.clear_color(0.0, 0.0, 0.0, 1.0);
-    context.clear(WebGl2RenderingContext::COLOR_BUFFER_BIT);
+    // Begin draw loop
+    let f = Rc::new(RefCell::new(None));
+    let g = f.clone();
 
-    context.bind_vertex_array(Some(&vao));
-    context.draw_elements_with_i32(
-        WebGl2RenderingContext::TRIANGLE_STRIP,
-        index_data.len() as i32,
-        WebGl2RenderingContext::UNSIGNED_SHORT,
-        0,
-    );
+    let mut frame = 0;
+    *g.borrow_mut() = Some(Closure::new(move || {
+        frame += 1;
 
-    context.bind_vertex_array(None);
+        // Update vertex data
+        let vertex_data =
+            build_vertex_data(x_len, y_len, (frame as f32) / 60.0);
+
+        context.bind_buffer(
+            WebGl2RenderingContext::ARRAY_BUFFER,
+            Some(&vertex_buffer),
+        );
+
+        unsafe {
+            let vertex_data_array_buf_view =
+                js_sys::Float32Array::view(&vertex_data);
+            context.buffer_data_with_array_buffer_view(
+                WebGl2RenderingContext::ARRAY_BUFFER,
+                &vertex_data_array_buf_view,
+                WebGl2RenderingContext::DYNAMIC_DRAW,
+            )
+        }
+
+        // Draw
+        context.clear_color(0.0, 0.0, 0.0, 1.0);
+        context.clear(WebGl2RenderingContext::COLOR_BUFFER_BIT);
+
+        context.bind_vertex_array(Some(&vao));
+        context.draw_elements_with_i32(
+            WebGl2RenderingContext::TRIANGLE_STRIP,
+            index_data.len() as i32,
+            WebGl2RenderingContext::UNSIGNED_SHORT,
+            0,
+        );
+
+        context.bind_vertex_array(None);
+
+        let finished = false;
+        if finished {
+            // Drop our handle to this closure so that it will get cleaned up once we return.
+            let _ = f.borrow_mut().take();
+            return;
+        }
+
+        request_animation_frame(f.borrow().as_ref().unwrap());
+    }));
+
+    request_animation_frame(g.borrow().as_ref().unwrap());
 
     Ok(())
 }
@@ -229,4 +272,14 @@ fn link_program(
             .get_program_info_log(&program)
             .unwrap_or_else(|| "Unknown error linking program".to_string()))
     }
+}
+
+fn window() -> web_sys::Window {
+    web_sys::window().expect("no global `window` exists")
+}
+
+fn request_animation_frame(f: &Closure<dyn FnMut()>) {
+    window()
+        .request_animation_frame(f.as_ref().unchecked_ref())
+        .expect("should register `requestAnimationFrame` OK");
 }
