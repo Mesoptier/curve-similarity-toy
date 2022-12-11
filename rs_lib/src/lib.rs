@@ -10,6 +10,14 @@ pub fn start(
     width: u32,
     height: u32,
 ) -> Result<(), JsValue> {
+    start_for_real(context, width, height)
+}
+
+pub fn start_for_real(
+    context: &WebGl2RenderingContext,
+    width: u32,
+    height: u32,
+) -> Result<(), JsValue> {
     let context = context.clone();
 
     let vert_shader = compile_shader(
@@ -66,8 +74,8 @@ pub fn start(
     const FLOATS_PER_COLOR: i32 = 3;
     const FLOATS_PER_VERTEX: i32 = FLOATS_PER_POSITION + FLOATS_PER_COLOR;
 
-    let x_len = 100;
-    let y_len = 100;
+    let x_len = 50;
+    let y_len = 50;
 
     fn build_vertex_data(x_len: i32, y_len: i32, t: f32) -> Vec<f32> {
         let vertex_data_len = ((x_len * y_len) * FLOATS_PER_VERTEX) as usize;
@@ -109,22 +117,37 @@ pub fn start(
         index_data
     }
 
-    // Create vertex buffer
+    // Buffers that will hold vertex and index data
     let vertex_buffer =
         context.create_buffer().ok_or("Failed to create buffer")?;
+    let index_buffer =
+        context.create_buffer().ok_or("Failed to create buffer")?;
+
+    // VertexArrayObject used for drawing the main triangle strip
+    let vao_triangles = context
+        .create_vertex_array()
+        .ok_or("Could not create vertex array object")?;
+    context.bind_vertex_array(Some(&vao_triangles));
+
     context.bind_buffer(
         WebGl2RenderingContext::ARRAY_BUFFER,
         Some(&vertex_buffer),
     );
+    context.bind_buffer(
+        WebGl2RenderingContext::ELEMENT_ARRAY_BUFFER,
+        Some(&index_buffer),
+    );
 
-    let vao = context
+    // VertexArrayObject used for drawing the mesh of the main triangle strip
+    let vao_lines = context
         .create_vertex_array()
         .ok_or("Could not create vertex array object")?;
-    context.bind_vertex_array(Some(&vao));
+    context.bind_vertex_array(Some(&vao_lines));
 
-    // Create index buffer
-    let index_buffer =
-        context.create_buffer().ok_or("Failed to create buffer")?;
+    context.bind_buffer(
+        WebGl2RenderingContext::ARRAY_BUFFER,
+        Some(&vertex_buffer),
+    );
     context.bind_buffer(
         WebGl2RenderingContext::ELEMENT_ARRAY_BUFFER,
         Some(&index_buffer),
@@ -132,7 +155,6 @@ pub fn start(
 
     // Build and upload index data
     let index_data = build_index_data(x_len, y_len);
-
     unsafe {
         let index_data_array_buf_view = js_sys::Uint16Array::view(&index_data);
         context.buffer_data_with_array_buffer_view(
@@ -147,6 +169,9 @@ pub fn start(
         context.get_attrib_location(&program, "a_position") as u32;
     let color_attribute =
         context.get_attrib_location(&program, "a_color") as u32;
+
+    // - Main triangles
+    context.bind_vertex_array(Some(&vao_triangles));
 
     context.vertex_attrib_pointer_with_i32(
         position_attribute,
@@ -168,9 +193,27 @@ pub fn start(
     );
     context.enable_vertex_attrib_array(color_attribute);
 
+    // - Mesh of main triangles (note: constant color)
+    context.bind_vertex_array(Some(&vao_lines));
+
+    context.vertex_attrib_pointer_with_i32(
+        position_attribute,
+        FLOATS_PER_POSITION,
+        WebGl2RenderingContext::FLOAT,
+        false,
+        FLOATS_PER_VERTEX * BYTES_PER_FLOAT,
+        0,
+    );
+    context.enable_vertex_attrib_array(position_attribute);
+
+    context.vertex_attrib3f(color_attribute, 0.0, 0.0, 0.0);
+
     // Begin draw loop
     let f = Rc::new(RefCell::new(None));
     let g = f.clone();
+
+    // TODO: add <button> to toggle this state
+    let draw_mesh = true;
 
     let mut frame = 0;
     *g.borrow_mut() = Some(Closure::new(move || {
@@ -199,13 +242,23 @@ pub fn start(
         context.clear_color(0.0, 0.0, 0.0, 1.0);
         context.clear(WebGl2RenderingContext::COLOR_BUFFER_BIT);
 
-        context.bind_vertex_array(Some(&vao));
+        context.bind_vertex_array(Some(&vao_triangles));
         context.draw_elements_with_i32(
             WebGl2RenderingContext::TRIANGLE_STRIP,
             index_data.len() as i32,
             WebGl2RenderingContext::UNSIGNED_SHORT,
             0,
         );
+
+        if draw_mesh {
+            context.bind_vertex_array(Some(&vao_lines));
+            context.draw_elements_with_i32(
+                WebGl2RenderingContext::LINE_STRIP,
+                index_data.len() as i32,
+                WebGl2RenderingContext::UNSIGNED_SHORT,
+                0,
+            );
+        }
 
         context.bind_vertex_array(None);
 
