@@ -210,6 +210,7 @@ pub fn start_for_real(
 
     // UI
     let show_mesh = Rc::new(Cell::new(false));
+    let is_playing = Rc::new(Cell::new(true));
 
     // Event listeners
     let document = web_sys::window().unwrap().document().unwrap();
@@ -224,13 +225,25 @@ pub fn start_for_real(
         closure.forget();
     }
 
+    {
+        let is_playing = is_playing.clone();
+        let closure = Closure::<dyn FnMut()>::new(move || {
+            is_playing.set(!is_playing.get());
+        });
+        let button = document.get_element_by_id("toggle-playing").unwrap();
+        button.add_event_listener_with_callback("click", closure.as_ref().unchecked_ref())?;
+        closure.forget();
+    }
+
     // Begin draw loop
     let f = Rc::new(RefCell::new(None));
     let g = f.clone();
 
     let mut frame = 0;
     *g.borrow_mut() = Some(Closure::new(move || {
-        frame += 1;
+        if is_playing.get() {
+            frame += 1;
+        }
 
         // Update vertex data
         let vertex_data =
