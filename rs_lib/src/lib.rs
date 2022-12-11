@@ -1,4 +1,4 @@
-use std::{cell::RefCell, rc::Rc};
+use std::{cell::{Cell, RefCell}, rc::Rc};
 
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
@@ -74,8 +74,8 @@ pub fn start_for_real(
     const FLOATS_PER_COLOR: i32 = 3;
     const FLOATS_PER_VERTEX: i32 = FLOATS_PER_POSITION + FLOATS_PER_COLOR;
 
-    let x_len = 50;
-    let y_len = 50;
+    let x_len = 100;
+    let y_len = 100;
 
     fn build_vertex_data(x_len: i32, y_len: i32, t: f32) -> Vec<f32> {
         let vertex_data_len = ((x_len * y_len) * FLOATS_PER_VERTEX) as usize;
@@ -208,12 +208,25 @@ pub fn start_for_real(
 
     context.vertex_attrib3f(color_attribute, 0.0, 0.0, 0.0);
 
+    // UI
+    let show_mesh = Rc::new(Cell::new(false));
+
+    // Event listeners
+    let document = web_sys::window().unwrap().document().unwrap();
+
+    {
+        let show_mesh = show_mesh.clone();
+        let closure = Closure::<dyn FnMut()>::new(move || {
+            show_mesh.set(!show_mesh.get());
+        });
+        let button = document.get_element_by_id("toggle-show-mesh").unwrap();
+        button.add_event_listener_with_callback("click", closure.as_ref().unchecked_ref())?;
+        closure.forget();
+    }
+
     // Begin draw loop
     let f = Rc::new(RefCell::new(None));
     let g = f.clone();
-
-    // TODO: add <button> to toggle this state
-    let draw_mesh = true;
 
     let mut frame = 0;
     *g.borrow_mut() = Some(Closure::new(move || {
@@ -250,7 +263,7 @@ pub fn start_for_real(
             0,
         );
 
-        if draw_mesh {
+        if show_mesh.get() {
             context.bind_vertex_array(Some(&vao_lines));
             context.draw_elements_with_i32(
                 WebGl2RenderingContext::LINE_STRIP,
