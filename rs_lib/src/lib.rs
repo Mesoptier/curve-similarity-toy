@@ -23,33 +23,13 @@ pub fn start_for_real(
     let vert_shader = compile_shader(
         &context,
         WebGl2RenderingContext::VERTEX_SHADER,
-        r##"#version 300 es
-
-        in vec4 a_position;
-        in vec4 a_color;
-        out vec4 v_color;
-
-        void main() {
-            v_color = a_color;
-            gl_Position = a_position;
-        }
-        "##,
+        include_str!("shader.vert"),
     )?;
 
     let frag_shader = compile_shader(
         &context,
         WebGl2RenderingContext::FRAGMENT_SHADER,
-        r##"#version 300 es
-
-        precision highp float;
-
-        in vec4 v_color;
-        out vec4 out_color;
-
-        void main() {
-            out_color = v_color;
-        }
-        "##,
+        include_str!("shader.frag"),
     )?;
 
     let program = link_program(&context, &vert_shader, &frag_shader)?;
