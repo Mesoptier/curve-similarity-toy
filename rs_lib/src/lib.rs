@@ -157,10 +157,6 @@ pub fn start_for_real(
     let color_map_uniform = context
         .get_uniform_location(&program, "u_color_map")
         .unwrap();
-    context.uniform3fv_with_f32_array(
-        Some(&color_map_uniform),
-        &color_maps::COLOR_MAP_MAGMA,
-    );
 
     // - Main triangles
     context.bind_vertex_array(Some(&vao_triangles));
@@ -205,6 +201,9 @@ pub fn start_for_real(
     let show_mesh = Rc::new(Cell::new(false));
     let is_playing = Rc::new(Cell::new(true));
 
+    let color_map_name = Rc::new(RefCell::new("magma".to_string()));
+    let color_map_name_changed = Rc::new(Cell::new(true));
+
     // Event listeners
     let document = web_sys::window().unwrap().document().unwrap();
 
@@ -213,7 +212,9 @@ pub fn start_for_real(
         let closure = Closure::<dyn FnMut()>::new(move || {
             show_mesh.set(!show_mesh.get());
         });
-        let button = document.get_element_by_id("toggle-show-mesh").unwrap();
+        let button = document
+            .get_element_by_id("toggle-show-mesh")
+            .expect("Element with ID #toggle-show-mesh");
         button.add_event_listener_with_callback(
             "click",
             closure.as_ref().unchecked_ref(),
@@ -226,9 +227,34 @@ pub fn start_for_real(
         let closure = Closure::<dyn FnMut()>::new(move || {
             is_playing.set(!is_playing.get());
         });
-        let button = document.get_element_by_id("toggle-playing").unwrap();
+        let button = document
+            .get_element_by_id("toggle-playing")
+            .expect("Element with ID #toggle-playing");
         button.add_event_listener_with_callback(
             "click",
+            closure.as_ref().unchecked_ref(),
+        )?;
+        closure.forget();
+    }
+
+    {
+        let color_map_name = color_map_name.clone();
+        let color_map_name_changed = color_map_name_changed.clone();
+        let closure =
+            Closure::<dyn FnMut(_)>::new(move |event: web_sys::InputEvent| {
+                *color_map_name.borrow_mut() = event
+                    .current_target()
+                    .unwrap()
+                    .dyn_into::<web_sys::HtmlSelectElement>()
+                    .unwrap()
+                    .value();
+                color_map_name_changed.set(true);
+            });
+        let select = document
+            .get_element_by_id("select-color-map")
+            .expect("Element with ID #select-color-map");
+        select.add_event_listener_with_callback(
+            "change",
             closure.as_ref().unchecked_ref(),
         )?;
         closure.forget();
@@ -237,6 +263,9 @@ pub fn start_for_real(
     // Begin draw loop
     let f = Rc::new(RefCell::new(None));
     let g = f.clone();
+
+    let color_map_name = color_map_name.clone();
+    let color_map_name_changed = color_map_name_changed.clone();
 
     let mut frame = 0;
     *g.borrow_mut() = Some(Closure::new(move || {
@@ -264,7 +293,24 @@ pub fn start_for_real(
         }
 
         // TODO: Update index data if x_len/y_len changed
-        // TODO: Update u_color_map if selected color map changed
+
+        // Update color map if the selected one changed
+        if color_map_name_changed.get() {
+            color_map_name_changed.set(false);
+
+            let color_map = match color_map_name.borrow().as_str() {
+                "magma" => color_maps::COLOR_MAP_MAGMA,
+                "inferno" => color_maps::COLOR_MAP_INFERNO,
+                "plasma" => color_maps::COLOR_MAP_PLASMA,
+                "viridis" => color_maps::COLOR_MAP_VIRIDIS,
+                _ => unreachable!("Invalid color map name"),
+            };
+
+            context.uniform3fv_with_f32_array(
+                Some(&color_map_uniform),
+                &color_map,
+            );
+        }
 
         // Draw
         context.clear_color(0.0, 0.0, 0.0, 1.0);

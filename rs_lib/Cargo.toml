@@ -17,6 +17,8 @@ features = [
 "Document",
 "Element",
 "EventTarget",
+"HtmlSelectElement",
+"InputEvent",
 "MouseEvent",
 "Node",
 "WebGlBuffer",
