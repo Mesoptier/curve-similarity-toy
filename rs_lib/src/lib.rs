@@ -1,4 +1,7 @@
-use std::{cell::{Cell, RefCell}, rc::Rc};
+use std::{
+    cell::{Cell, RefCell},
+    rc::Rc,
+};
 
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
@@ -209,7 +212,10 @@ pub fn start_for_real(
             show_mesh.set(!show_mesh.get());
         });
         let button = document.get_element_by_id("toggle-show-mesh").unwrap();
-        button.add_event_listener_with_callback("click", closure.as_ref().unchecked_ref())?;
+        button.add_event_listener_with_callback(
+            "click",
+            closure.as_ref().unchecked_ref(),
+        )?;
         closure.forget();
     }
 
@@ -219,7 +225,10 @@ pub fn start_for_real(
             is_playing.set(!is_playing.get());
         });
         let button = document.get_element_by_id("toggle-playing").unwrap();
-        button.add_event_listener_with_callback("click", closure.as_ref().unchecked_ref())?;
+        button.add_event_listener_with_callback(
+            "click",
+            closure.as_ref().unchecked_ref(),
+        )?;
         closure.forget();
     }
 
