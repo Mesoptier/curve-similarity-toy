@@ -71,6 +71,8 @@ pub fn start_for_real(
             }
         }
 
+        assert_eq!(vertex_data.len(), vertex_data_len);
+
         vertex_data
     }
 
@@ -94,6 +96,8 @@ pub fn start_for_real(
                 index_data.push((((y + 1) * x_len) + (x_len - 1)) as u32);
             }
         }
+
+        assert_eq!(index_data.len(), index_data_len);
 
         index_data
     }
