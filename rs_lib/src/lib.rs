@@ -7,6 +7,8 @@ use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
 use web_sys::{WebGl2RenderingContext, WebGlProgram, WebGlShader};
 
+mod color_maps;
+
 #[wasm_bindgen]
 pub fn start(
     context: &WebGl2RenderingContext,
@@ -151,6 +153,14 @@ pub fn start_for_real(
         context.get_attrib_location(&program, "a_position") as u32;
     let value_attribute =
         context.get_attrib_location(&program, "a_value") as u32;
+
+    let color_map_uniform = context
+        .get_uniform_location(&program, "u_color_map")
+        .unwrap();
+    context.uniform3fv_with_f32_array(
+        Some(&color_map_uniform),
+        &color_maps::COLOR_MAP_MAGMA,
+    );
 
     // - Main triangles
     context.bind_vertex_array(Some(&vao_triangles));
