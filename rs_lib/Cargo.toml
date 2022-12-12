@@ -17,6 +17,7 @@ features = [
 "Document",
 "Element",
 "EventTarget",
+"HtmlInputElement",
 "HtmlSelectElement",
 "InputEvent",
 "MouseEvent",

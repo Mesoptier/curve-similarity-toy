@@ -51,9 +51,6 @@ pub fn start_for_real(
     const FLOATS_PER_VALUE: i32 = 1;
     const FLOATS_PER_VERTEX: i32 = FLOATS_PER_POSITION + FLOATS_PER_VALUE;
 
-    let x_len = 100;
-    let y_len = 100;
-
     fn build_vertex_data(x_len: i32, y_len: i32, t: f32) -> Vec<f32> {
         let vertex_data_len = ((x_len * y_len) * FLOATS_PER_VERTEX) as usize;
         let mut vertex_data: Vec<f32> = Vec::with_capacity(vertex_data_len);
@@ -77,24 +74,24 @@ pub fn start_for_real(
         vertex_data
     }
 
-    fn build_index_data(x_len: i32, y_len: i32) -> Vec<u16> {
+    fn build_index_data(x_len: i32, y_len: i32) -> Vec<u32> {
         let index_data_len = 2 * (x_len * (y_len - 1) + (y_len - 2)) as usize;
-        let mut index_data: Vec<u16> = Vec::with_capacity(index_data_len);
+        let mut index_data: Vec<u32> = Vec::with_capacity(index_data_len);
 
         for y in 0..(y_len - 1) {
             if y > 0 {
                 // Degenerate begin: repeat first vertex
-                index_data.push((y * x_len) as u16);
+                index_data.push((y * x_len) as u32);
             }
 
             for x in 0..x_len {
-                index_data.push(((y * x_len) + x) as u16);
-                index_data.push((((y + 1) * x_len) + x) as u16);
+                index_data.push(((y * x_len) + x) as u32);
+                index_data.push((((y + 1) * x_len) + x) as u32);
             }
 
             if y < y_len - 2 {
                 // Degenerate end: repeat last vertex
-                index_data.push((((y + 1) * x_len) + (x_len - 1)) as u16);
+                index_data.push((((y + 1) * x_len) + (x_len - 1)) as u32);
             }
         }
 
@@ -136,17 +133,6 @@ pub fn start_for_real(
         WebGl2RenderingContext::ELEMENT_ARRAY_BUFFER,
         Some(&index_buffer),
     );
-
-    // Build and upload index data
-    let index_data = build_index_data(x_len, y_len);
-    unsafe {
-        let index_data_array_buf_view = js_sys::Uint16Array::view(&index_data);
-        context.buffer_data_with_array_buffer_view(
-            WebGl2RenderingContext::ELEMENT_ARRAY_BUFFER,
-            &index_data_array_buf_view,
-            WebGl2RenderingContext::STATIC_DRAW,
-        )
-    }
 
     // Bind attributes
     let position_attribute =
@@ -204,6 +190,9 @@ pub fn start_for_real(
     let color_map_name = Rc::new(RefCell::new("magma".to_string()));
     let color_map_name_changed = Rc::new(Cell::new(true));
 
+    let resolution = Rc::new(Cell::new(7i32));
+    let resolution_changed = Rc::new(Cell::new(true));
+
     // Event listeners
     let document = web_sys::window().unwrap().document().unwrap();
 
@@ -260,6 +249,33 @@ pub fn start_for_real(
         closure.forget();
     }
 
+    {
+        let resolution = resolution.clone();
+        let resolution_changed = resolution_changed.clone();
+        let closure =
+            Closure::<dyn FnMut(_)>::new(move |event: web_sys::InputEvent| {
+                resolution.set(
+                    event
+                        .current_target()
+                        .unwrap()
+                        .dyn_into::<web_sys::HtmlInputElement>()
+                        .unwrap()
+                        .value()
+                        .parse()
+                        .unwrap(),
+                );
+                resolution_changed.set(true);
+            });
+        let input = document
+            .get_element_by_id("input-resolution")
+            .expect("Element with ID #input-resolution");
+        input.add_event_listener_with_callback(
+            "input",
+            closure.as_ref().unchecked_ref(),
+        )?;
+        closure.forget();
+    }
+
     // Begin draw loop
     let f = Rc::new(RefCell::new(None));
     let g = f.clone();
@@ -272,6 +288,12 @@ pub fn start_for_real(
         if is_playing.get() {
             frame += 1;
         }
+
+        let resolution = 2i32.pow(resolution.get() as u32);
+        let x_len = resolution;
+        let y_len = resolution;
+
+        let index_data_len = 2 * (x_len * (y_len - 1) + (y_len - 2)) as usize;
 
         // Update vertex data
         let vertex_data =
@@ -290,6 +312,28 @@ pub fn start_for_real(
                 &vertex_data_array_buf_view,
                 WebGl2RenderingContext::DYNAMIC_DRAW,
             )
+        }
+
+        // Update index data
+        if resolution_changed.get() {
+            resolution_changed.set(false);
+
+            let index_data = build_index_data(x_len, y_len);
+
+            context.bind_buffer(
+                WebGl2RenderingContext::ELEMENT_ARRAY_BUFFER,
+                Some(&index_buffer),
+            );
+
+            unsafe {
+                let index_data_array_buf_view =
+                    js_sys::Uint32Array::view(&index_data);
+                context.buffer_data_with_array_buffer_view(
+                    WebGl2RenderingContext::ELEMENT_ARRAY_BUFFER,
+                    &index_data_array_buf_view,
+                    WebGl2RenderingContext::DYNAMIC_DRAW,
+                )
+            }
         }
 
         // TODO: Update index data if x_len/y_len changed
@@ -319,8 +363,8 @@ pub fn start_for_real(
         context.bind_vertex_array(Some(&vao_triangles));
         context.draw_elements_with_i32(
             WebGl2RenderingContext::TRIANGLE_STRIP,
-            index_data.len() as i32,
-            WebGl2RenderingContext::UNSIGNED_SHORT,
+            index_data_len as i32,
+            WebGl2RenderingContext::UNSIGNED_INT,
             0,
         );
 
@@ -328,8 +372,8 @@ pub fn start_for_real(
             context.bind_vertex_array(Some(&vao_lines));
             context.draw_elements_with_i32(
                 WebGl2RenderingContext::LINE_STRIP,
-                index_data.len() as i32,
-                WebGl2RenderingContext::UNSIGNED_SHORT,
+                index_data_len as i32,
+                WebGl2RenderingContext::UNSIGNED_INT,
                 0,
             );
         }
