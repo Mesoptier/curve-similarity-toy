@@ -76,6 +76,14 @@ pub fn start_for_real(
         vertex_data
     }
 
+    fn update_vertex_data(t: f32, vertex_data: &mut Vec<f32>) {
+        for idx in (0..vertex_data.len()).step_by(FLOATS_PER_VERTEX as usize) {
+            let x = vertex_data[idx + 0];
+            let y = vertex_data[idx + 1];
+            vertex_data[idx + 2] = f(x, y, t);
+        }
+    }
+
     fn build_index_data(x_len: i32, y_len: i32) -> Vec<u32> {
         let index_data_len = 2 * (x_len * (y_len - 1) + (y_len - 2)) as usize;
         let mut index_data: Vec<u32> = Vec::with_capacity(index_data_len);
@@ -284,8 +292,8 @@ pub fn start_for_real(
     let f = Rc::new(RefCell::new(None));
     let g = f.clone();
 
-    let color_map_name = color_map_name.clone();
-    let color_map_name_changed = color_map_name_changed.clone();
+    let vertex_data = Rc::new(RefCell::new(build_vertex_data(2, 2, 0.0)));
+    let index_data = Rc::new(RefCell::new(build_index_data(2, 2)));
 
     let mut frame = 0;
     *g.borrow_mut() = Some(Closure::new(move || {
@@ -293,54 +301,56 @@ pub fn start_for_real(
             frame += 1;
         }
 
+        let t = (frame as f32) / 60.0;
+
         let resolution = 2i32.pow(resolution.get() as u32);
         let x_len = resolution;
         let y_len = resolution;
 
         let index_data_len = 2 * (x_len * (y_len - 1) + (y_len - 2)) as usize;
 
-        // Update vertex data
-        let vertex_data =
-            build_vertex_data(x_len, y_len, (frame as f32) / 60.0);
-
-        context.bind_buffer(
-            WebGl2RenderingContext::ARRAY_BUFFER,
-            Some(&vertex_buffer),
-        );
-
-        unsafe {
-            let vertex_data_array_buf_view =
-                js_sys::Float32Array::view(&vertex_data);
-            context.buffer_data_with_array_buffer_view(
-                WebGl2RenderingContext::ARRAY_BUFFER,
-                &vertex_data_array_buf_view,
-                WebGl2RenderingContext::DYNAMIC_DRAW,
-            )
-        }
-
-        // Update index data
         if resolution_changed.get() {
             resolution_changed.set(false);
 
-            let index_data = build_index_data(x_len, y_len);
+            // Rebuild vertex data
+            *vertex_data.borrow_mut() = build_vertex_data(x_len, y_len, t);
 
+            // Rebuild index data
+            *index_data.borrow_mut() = build_index_data(x_len, y_len);
+
+            // Upload updated index data
             context.bind_buffer(
                 WebGl2RenderingContext::ELEMENT_ARRAY_BUFFER,
                 Some(&index_buffer),
             );
-
             unsafe {
                 let index_data_array_buf_view =
-                    js_sys::Uint32Array::view(&index_data);
+                    js_sys::Uint32Array::view(&index_data.borrow());
                 context.buffer_data_with_array_buffer_view(
                     WebGl2RenderingContext::ELEMENT_ARRAY_BUFFER,
                     &index_data_array_buf_view,
                     WebGl2RenderingContext::DYNAMIC_DRAW,
                 )
             }
+        } else {
+            // Update vertex data
+            update_vertex_data(t, &mut vertex_data.borrow_mut());
         }
 
-        // TODO: Update index data if x_len/y_len changed
+        // Upload updated vertex data
+        context.bind_buffer(
+            WebGl2RenderingContext::ARRAY_BUFFER,
+            Some(&vertex_buffer),
+        );
+        unsafe {
+            let vertex_data_array_buf_view =
+                js_sys::Float32Array::view(&vertex_data.borrow());
+            context.buffer_data_with_array_buffer_view(
+                WebGl2RenderingContext::ARRAY_BUFFER,
+                &vertex_data_array_buf_view,
+                WebGl2RenderingContext::DYNAMIC_DRAW,
+            )
+        }
 
         // Update color map if the selected one changed
         if color_map_name_changed.get() {
