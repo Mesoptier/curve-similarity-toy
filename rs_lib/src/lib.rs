@@ -43,18 +43,11 @@ pub fn start_for_real(
         ((x * y * 10.0 + t).sin() + 1.0) / 2.0
     }
 
-    /// Maps from t in [0, 1] to the color that should be rendered
-    fn c(t: f32) -> [f32; 3] {
-        // TODO: This exposes a path on the local filesystem in the compiled WASM
-        let color = palette::gradient::named::PLASMA.get(t);
-        [color.red, color.green, color.blue]
-    }
-
     const BYTES_PER_FLOAT: i32 = 4;
 
     const FLOATS_PER_POSITION: i32 = 2;
-    const FLOATS_PER_COLOR: i32 = 3;
-    const FLOATS_PER_VERTEX: i32 = FLOATS_PER_POSITION + FLOATS_PER_COLOR;
+    const FLOATS_PER_VALUE: i32 = 1;
+    const FLOATS_PER_VERTEX: i32 = FLOATS_PER_POSITION + FLOATS_PER_VALUE;
 
     let x_len = 100;
     let y_len = 100;
@@ -68,16 +61,14 @@ pub fn start_for_real(
                 let x: f32 = (x_idx as f32 / (x_len - 1) as f32) * 2.0 - 1.0;
                 let y: f32 = (y_idx as f32 / (y_len - 1) as f32) * 2.0 - 1.0;
 
-                let [r, g, b] = c(f(x, y, t));
+                let v = f(x, y, t);
 
                 // FLOATS_PER_POSITION
                 vertex_data.push(x);
                 vertex_data.push(y);
 
-                // FLOATS_PER_COLOR
-                vertex_data.push(r);
-                vertex_data.push(g);
-                vertex_data.push(b);
+                // FLOATS_PER_VALUE
+                vertex_data.push(v);
             }
         }
 
@@ -158,8 +149,8 @@ pub fn start_for_real(
     // Bind attributes
     let position_attribute =
         context.get_attrib_location(&program, "a_position") as u32;
-    let color_attribute =
-        context.get_attrib_location(&program, "a_color") as u32;
+    let value_attribute =
+        context.get_attrib_location(&program, "a_value") as u32;
 
     // - Main triangles
     context.bind_vertex_array(Some(&vao_triangles));
@@ -175,16 +166,16 @@ pub fn start_for_real(
     context.enable_vertex_attrib_array(position_attribute);
 
     context.vertex_attrib_pointer_with_i32(
-        color_attribute,
-        FLOATS_PER_COLOR,
+        value_attribute,
+        FLOATS_PER_VALUE,
         WebGl2RenderingContext::FLOAT,
         false,
         FLOATS_PER_VERTEX * BYTES_PER_FLOAT,
         FLOATS_PER_POSITION * BYTES_PER_FLOAT,
     );
-    context.enable_vertex_attrib_array(color_attribute);
+    context.enable_vertex_attrib_array(value_attribute);
 
-    // - Mesh of main triangles (note: constant color)
+    // - Mesh of main triangles (note: constant value)
     context.bind_vertex_array(Some(&vao_lines));
 
     context.vertex_attrib_pointer_with_i32(
@@ -197,7 +188,8 @@ pub fn start_for_real(
     );
     context.enable_vertex_attrib_array(position_attribute);
 
-    context.vertex_attrib3f(color_attribute, 0.0, 0.0, 0.0);
+    // TODO: Use alternative vertex shader with a color uniform instead of a value attribute
+    context.vertex_attrib1f(value_attribute, 0.0);
 
     // UI
     let show_mesh = Rc::new(Cell::new(false));
@@ -260,6 +252,9 @@ pub fn start_for_real(
                 WebGl2RenderingContext::DYNAMIC_DRAW,
             )
         }
+
+        // TODO: Update index data if x_len/y_len changed
+        // TODO: Update u_color_map if selected color map changed
 
         // Draw
         context.clear_color(0.0, 0.0, 0.0, 1.0);
