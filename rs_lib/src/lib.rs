@@ -1,5 +1,6 @@
 use std::{
     cell::{Cell, RefCell},
+    mem,
     rc::Rc,
 };
 
@@ -8,6 +9,27 @@ use wasm_bindgen::JsCast;
 use web_sys::{WebGl2RenderingContext, WebGlProgram, WebGlShader};
 
 mod color_maps;
+
+#[repr(C)]
+struct Vertex {
+    x: f32,
+    y: f32,
+    v: f32,
+}
+
+trait VecExt<T>
+where
+    T: Sized,
+{
+    unsafe fn as_u8_slice(&self) -> &[u8];
+}
+
+impl<T> VecExt<T> for Vec<T> {
+    unsafe fn as_u8_slice(&self) -> &[u8] {
+        let num_bytes = self.len() * mem::size_of::<T>();
+        std::slice::from_raw_parts(self.as_ptr() as *const u8, num_bytes)
+    }
+}
 
 #[wasm_bindgen]
 pub fn start(
@@ -51,23 +73,22 @@ pub fn start_for_real(
     const FLOATS_PER_VALUE: i32 = 1;
     const FLOATS_PER_VERTEX: i32 = FLOATS_PER_POSITION + FLOATS_PER_VALUE;
 
-    fn build_vertex_data(x_len: i32, y_len: i32, t: f32) -> Vec<f32> {
-        let vertex_data_len = ((x_len * y_len) * FLOATS_PER_VERTEX) as usize;
-        let mut vertex_data: Vec<f32> = Vec::with_capacity(vertex_data_len);
+    assert_eq!(
+        (BYTES_PER_FLOAT * FLOATS_PER_VERTEX) as usize,
+        mem::size_of::<Vertex>()
+    );
+
+    fn build_vertex_data(x_len: i32, y_len: i32, t: f32) -> Vec<Vertex> {
+        let vertex_data_len = (x_len * y_len) as usize;
+        let mut vertex_data: Vec<Vertex> = Vec::with_capacity(vertex_data_len);
 
         for y_idx in 0..y_len {
             for x_idx in 0..x_len {
                 let x: f32 = (x_idx as f32 / (x_len - 1) as f32) * 2.0 - 1.0;
                 let y: f32 = (y_idx as f32 / (y_len - 1) as f32) * 2.0 - 1.0;
-
                 let v = f(x, y, t);
 
-                // FLOATS_PER_POSITION
-                vertex_data.push(x);
-                vertex_data.push(y);
-
-                // FLOATS_PER_VALUE
-                vertex_data.push(v);
+                vertex_data.push(Vertex { x, y, v });
             }
         }
 
@@ -76,11 +97,9 @@ pub fn start_for_real(
         vertex_data
     }
 
-    fn update_vertex_data(t: f32, vertex_data: &mut Vec<f32>) {
-        for idx in (0..vertex_data.len()).step_by(FLOATS_PER_VERTEX as usize) {
-            let x = vertex_data[idx + 0];
-            let y = vertex_data[idx + 1];
-            vertex_data[idx + 2] = f(x, y, t);
+    fn update_vertex_data(t: f32, vertex_data: &mut Vec<Vertex>) {
+        for vertex in vertex_data {
+            vertex.v = f(vertex.x, vertex.y, t);
         }
     }
 
@@ -324,8 +343,12 @@ pub fn start_for_real(
                 Some(&index_buffer),
             );
             unsafe {
+                // SAFETY: We're creating a view directly into memory, which might
+                // become invalid if we're doing any allocations after this. The
+                // view is used immediately to copy data into a GPU buffer, after
+                // which it is discarded.
                 let index_data_array_buf_view =
-                    js_sys::Uint32Array::view(&index_data.borrow());
+                    js_sys::Uint8Array::view(index_data.borrow().as_u8_slice());
                 context.buffer_data_with_array_buffer_view(
                     WebGl2RenderingContext::ELEMENT_ARRAY_BUFFER,
                     &index_data_array_buf_view,
@@ -343,13 +366,17 @@ pub fn start_for_real(
             Some(&vertex_buffer),
         );
         unsafe {
+            // SAFETY: We're creating a view directly into memory, which might
+            // become invalid if we're doing any allocations after this. The
+            // view is used immediately to copy data into a GPU buffer, after
+            // which it is discarded.
             let vertex_data_array_buf_view =
-                js_sys::Float32Array::view(&vertex_data.borrow());
+                js_sys::Uint8Array::view(vertex_data.borrow().as_u8_slice());
             context.buffer_data_with_array_buffer_view(
                 WebGl2RenderingContext::ARRAY_BUFFER,
                 &vertex_data_array_buf_view,
                 WebGl2RenderingContext::DYNAMIC_DRAW,
-            )
+            );
         }
 
         // Update color map if the selected one changed
