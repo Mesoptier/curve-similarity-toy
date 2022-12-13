@@ -7,6 +7,7 @@ edition = "2021"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
+itertools = "0.10.5"
 js-sys = "0.3.60"
 palette = "0.6.1"
 wasm-bindgen = "0.2.83"
@@ -14,6 +15,7 @@ wasm-bindgen = "0.2.83"
 [dependencies.web-sys]
 version = "0.3.60"
 features = [
+"console",
 "Document",
 "Element",
 "EventTarget",

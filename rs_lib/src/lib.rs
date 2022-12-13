@@ -4,17 +4,81 @@ use std::{
     rc::Rc,
 };
 
+use itertools::{Itertools, TupleWindows};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
 use web_sys::{WebGl2RenderingContext, WebGlProgram, WebGlShader};
 
 mod color_maps;
 
+#[derive(Debug)]
 #[repr(C)]
 struct Vertex {
     x: f32,
     y: f32,
     v: f32,
+}
+
+// TODO: Should this contain references to vertices, or just copies of the vertices?
+#[derive(Debug)]
+struct Triangle<'a>(&'a Vertex, &'a Vertex, &'a Vertex);
+
+struct TriangleStripIter<'a, I>
+where
+    I: Iterator<Item = &'a u32>,
+{
+    vertices: &'a Vec<Vertex>,
+    indices_iter: TupleWindows<I, (&'a u32, &'a u32, &'a u32)>,
+}
+
+impl<'a, I> TriangleStripIter<'a, I>
+where
+    I: Iterator<Item = &'a u32>,
+{
+    fn new(vertices: &'a Vec<Vertex>, indices: I) -> Self {
+        Self {
+            vertices,
+            indices_iter: indices.tuple_windows(),
+        }
+    }
+}
+
+impl<'a, I> Iterator for TriangleStripIter<'a, I>
+where
+    I: Iterator<Item = &'a u32>,
+{
+    type Item = Triangle<'a>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        // TODO: Make this actually iterate like WebGL's triangle strip
+        self.indices_iter.next().map(|(i1, i2, i3)| {
+            Triangle(
+                &self.vertices[*i1 as usize],
+                &self.vertices[*i2 as usize],
+                &self.vertices[*i3 as usize],
+            )
+        })
+    }
+}
+
+struct TriangleMesh {
+    vertices: Vec<Vertex>,
+    indices: Vec<u32>,
+}
+
+impl TriangleMesh {
+    fn new() -> Self {
+        Self {
+            vertices: vec![],
+            indices: vec![],
+        }
+    }
+
+    fn iter_triangles(
+        &self,
+    ) -> TriangleStripIter<'_, std::slice::Iter<'_, u32>> {
+        TriangleStripIter::new(&self.vertices, self.indices.iter())
+    }
 }
 
 trait VecExt<T>
@@ -311,8 +375,14 @@ pub fn start_for_real(
     let f = Rc::new(RefCell::new(None));
     let g = f.clone();
 
-    let vertex_data = Rc::new(RefCell::new(build_vertex_data(2, 2, 0.0)));
-    let index_data = Rc::new(RefCell::new(build_index_data(2, 2)));
+    let mesh = Rc::new(RefCell::new(TriangleMesh::new()));
+
+    // TODO: Remove this debugging code
+    mesh.borrow_mut().vertices = build_vertex_data(4, 4, 0.0);
+    mesh.borrow_mut().indices = build_index_data(4, 4);
+    let msg =
+        format!("{:#?}", mesh.borrow().iter_triangles().collect::<Vec<_>>());
+    web_sys::console::log_1(&msg.into());
 
     let mut frame = 0;
     *g.borrow_mut() = Some(Closure::new(move || {
@@ -332,10 +402,10 @@ pub fn start_for_real(
             resolution_changed.set(false);
 
             // Rebuild vertex data
-            *vertex_data.borrow_mut() = build_vertex_data(x_len, y_len, t);
+            mesh.borrow_mut().vertices = build_vertex_data(x_len, y_len, t);
 
             // Rebuild index data
-            *index_data.borrow_mut() = build_index_data(x_len, y_len);
+            mesh.borrow_mut().indices = build_index_data(x_len, y_len);
 
             // Upload updated index data
             context.bind_buffer(
@@ -347,8 +417,9 @@ pub fn start_for_real(
                 // become invalid if we're doing any allocations after this. The
                 // view is used immediately to copy data into a GPU buffer, after
                 // which it is discarded.
-                let index_data_array_buf_view =
-                    js_sys::Uint8Array::view(index_data.borrow().as_u8_slice());
+                let index_data_array_buf_view = js_sys::Uint8Array::view(
+                    mesh.borrow().indices.as_u8_slice(),
+                );
                 context.buffer_data_with_array_buffer_view(
                     WebGl2RenderingContext::ELEMENT_ARRAY_BUFFER,
                     &index_data_array_buf_view,
@@ -357,7 +428,7 @@ pub fn start_for_real(
             }
         } else {
             // Update vertex data
-            update_vertex_data(t, &mut vertex_data.borrow_mut());
+            update_vertex_data(t, &mut mesh.borrow_mut().vertices);
         }
 
         // Upload updated vertex data
@@ -371,7 +442,7 @@ pub fn start_for_real(
             // view is used immediately to copy data into a GPU buffer, after
             // which it is discarded.
             let vertex_data_array_buf_view =
-                js_sys::Uint8Array::view(vertex_data.borrow().as_u8_slice());
+                js_sys::Uint8Array::view(mesh.borrow().vertices.as_u8_slice());
             context.buffer_data_with_array_buffer_view(
                 WebGl2RenderingContext::ARRAY_BUFFER,
                 &vertex_data_array_buf_view,
