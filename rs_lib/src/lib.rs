@@ -173,8 +173,8 @@ pub fn start(
 
 pub fn start_for_real(
     context: &WebGl2RenderingContext,
-    width: u32,
-    height: u32,
+    _width: u32,
+    _height: u32,
 ) -> Result<(), JsValue> {
     let context = context.clone();
 
