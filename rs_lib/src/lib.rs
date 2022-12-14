@@ -545,6 +545,26 @@ pub fn start_for_real(
             // Rebuild index data
             mesh.borrow_mut().indices = build_index_data(x_len, y_len);
 
+            // Upload updated vertex data
+            context.bind_buffer(
+                WebGl2RenderingContext::ARRAY_BUFFER,
+                Some(&vertex_buffer),
+            );
+            unsafe {
+                // SAFETY: We're creating a view directly into memory, which might
+                // become invalid if we're doing any allocations after this. The
+                // view is used immediately to copy data into a GPU buffer, after
+                // which it is discarded.
+                let vertex_data_array_buf_view = js_sys::Uint8Array::view(
+                    mesh.borrow().vertices.as_u8_slice(),
+                );
+                context.buffer_data_with_array_buffer_view(
+                    WebGl2RenderingContext::ARRAY_BUFFER,
+                    &vertex_data_array_buf_view,
+                    WebGl2RenderingContext::DYNAMIC_DRAW,
+                );
+            }
+
             // Upload updated index data
             context.bind_buffer(
                 WebGl2RenderingContext::ELEMENT_ARRAY_BUFFER,
@@ -561,31 +581,32 @@ pub fn start_for_real(
                 context.buffer_data_with_array_buffer_view(
                     WebGl2RenderingContext::ELEMENT_ARRAY_BUFFER,
                     &index_data_array_buf_view,
-                    WebGl2RenderingContext::DYNAMIC_DRAW,
+                    WebGl2RenderingContext::STATIC_DRAW,
                 )
             }
         } else {
             // Update vertex data
             update_vertex_data(t, &mut mesh.borrow_mut().vertices);
-        }
 
-        // Upload updated vertex data
-        context.bind_buffer(
-            WebGl2RenderingContext::ARRAY_BUFFER,
-            Some(&vertex_buffer),
-        );
-        unsafe {
-            // SAFETY: We're creating a view directly into memory, which might
-            // become invalid if we're doing any allocations after this. The
-            // view is used immediately to copy data into a GPU buffer, after
-            // which it is discarded.
-            let vertex_data_array_buf_view =
-                js_sys::Uint8Array::view(mesh.borrow().vertices.as_u8_slice());
-            context.buffer_data_with_array_buffer_view(
+            // Upload updated vertex data
+            context.bind_buffer(
                 WebGl2RenderingContext::ARRAY_BUFFER,
-                &vertex_data_array_buf_view,
-                WebGl2RenderingContext::DYNAMIC_DRAW,
+                Some(&vertex_buffer),
             );
+            unsafe {
+                // SAFETY: We're creating a view directly into memory, which might
+                // become invalid if we're doing any allocations after this. The
+                // view is used immediately to copy data into a GPU buffer, after
+                // which it is discarded.
+                let vertex_data_array_buf_view = js_sys::Uint8Array::view(
+                    mesh.borrow().vertices.as_u8_slice(),
+                );
+                context.buffer_sub_data_with_i32_and_array_buffer_view(
+                    WebGl2RenderingContext::ARRAY_BUFFER,
+                    0,
+                    &vertex_data_array_buf_view,
+                );
+            }
         }
 
         // Build and upload vertex data for isolines
