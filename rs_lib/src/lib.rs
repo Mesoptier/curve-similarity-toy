@@ -1,6 +1,7 @@
 use std::{
     cell::{Cell, RefCell},
     mem,
+    ops::{Add, Mul},
     rc::Rc,
 };
 
@@ -17,6 +18,46 @@ struct Vertex {
     x: f32,
     y: f32,
     v: f32,
+}
+
+impl Add for Vertex {
+    type Output = Self;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        Vertex {
+            x: self.x + rhs.x,
+            y: self.y + rhs.y,
+            v: self.v + rhs.v,
+        }
+    }
+}
+
+impl Mul<f32> for Vertex {
+    type Output = Self;
+
+    fn mul(self, rhs: f32) -> Self::Output {
+        Vertex {
+            x: self.x * rhs,
+            y: self.y * rhs,
+            v: self.v * rhs,
+        }
+    }
+}
+
+trait Mix {
+    type Output;
+    fn mix(self, other: Self, t: f32) -> Self::Output;
+}
+
+impl<T> Mix for T
+where
+    T: Add<T, Output = T> + Mul<f32, Output = T>,
+{
+    type Output = Self;
+
+    fn mix(self, other: Self, t: f32) -> Self::Output {
+        self * (1.0 - t) + other * t
+    }
 }
 
 // TODO: Should this contain references to vertices, or just copies of the vertices?
