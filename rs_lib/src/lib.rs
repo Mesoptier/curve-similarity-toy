@@ -131,22 +131,34 @@ impl TriangleMesh {
 fn make_isolines(mesh: &TriangleMesh, threshold: f32) -> Vec<Vertex> {
     let mut isoline_vertices = vec![];
 
+    fn get_t(min: f32, max: f32, x: f32) -> f32 {
+        if min > max {
+            return 1.0 - get_t(max, min, x);
+        }
+        (x - min) / (max - min)
+    }
+
+    let mut push_edge = |v1: Vertex, v2: Vertex| {
+        let t = get_t(v1.v, v2.v, threshold);
+        isoline_vertices.push(v1.mix(v2, t));
+    };
+
     for triangle in mesh.iter_triangles() {
         let Triangle(&v0, &v1, &v2) = triangle;
 
         match (v0.v > threshold, v1.v > threshold, v2.v > threshold) {
             (true, true, true) | (false, false, false) => {}
             (true, true, false) | (false, false, true) => {
-                isoline_vertices.push((v0).mix(v2, 0.5));
-                isoline_vertices.push((v1).mix(v2, 0.5));
+                push_edge(v0, v2);
+                push_edge(v1, v2);
             }
             (true, false, true) | (false, true, false) => {
-                isoline_vertices.push((v0).mix(v1, 0.5));
-                isoline_vertices.push((v2).mix(v1, 0.5));
+                push_edge(v0, v1);
+                push_edge(v2, v1);
             }
             (true, false, false) | (false, true, true) => {
-                isoline_vertices.push((v1).mix(v0, 0.5));
-                isoline_vertices.push((v2).mix(v0, 0.5));
+                push_edge(v1, v0);
+                push_edge(v2, v0);
             }
         }
     }
