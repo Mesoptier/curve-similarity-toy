@@ -264,13 +264,25 @@ pub fn start_for_real(
     let program = link_program(&context, &vert_shader, &frag_shader)?;
     context.use_program(Some(&program));
 
-    // Buffers that will hold vertex and index data
+    // Init: get attributes and uniforms
+    let position_attribute =
+        context.get_attrib_location(&program, "a_position") as u32;
+    let value_attribute =
+        context.get_attrib_location(&program, "a_value") as u32;
+
+    let color_map_uniform = context
+        .get_uniform_location(&program, "u_color_map")
+        .unwrap();
+
+    // Init: create buffers
     let vertex_buffer =
         context.create_buffer().ok_or("Failed to create buffer")?;
     let index_buffer =
         context.create_buffer().ok_or("Failed to create buffer")?;
+    let isoline_vertex_buffer =
+        context.create_buffer().ok_or("Failed to create buffer")?;
 
-    // VertexArrayObject used for drawing the main triangle strip
+    // Init: setup VertexArrayObject for main triangle mesh
     let vao_triangles = context
         .create_vertex_array()
         .ok_or("Could not create vertex array object")?;
@@ -285,7 +297,29 @@ pub fn start_for_real(
         Some(&index_buffer),
     );
 
-    // VertexArrayObject used for drawing the mesh of the main triangle strip
+    context.enable_vertex_attrib_array(position_attribute);
+    context.vertex_attrib_pointer_with_i32(
+        position_attribute,
+        FLOATS_PER_POSITION,
+        WebGl2RenderingContext::FLOAT,
+        false,
+        FLOATS_PER_VERTEX * BYTES_PER_FLOAT,
+        0,
+    );
+
+    context.enable_vertex_attrib_array(value_attribute);
+    context.vertex_attrib_pointer_with_i32(
+        value_attribute,
+        FLOATS_PER_VALUE,
+        WebGl2RenderingContext::FLOAT,
+        false,
+        FLOATS_PER_VERTEX * BYTES_PER_FLOAT,
+        FLOATS_PER_POSITION * BYTES_PER_FLOAT,
+    );
+
+    context.bind_vertex_array(None);
+
+    // Init: setup VertexArrayObject for mesh lines of main triangle mesh
     let vao_lines = context
         .create_vertex_array()
         .ok_or("Could not create vertex array object")?;
@@ -300,19 +334,7 @@ pub fn start_for_real(
         Some(&index_buffer),
     );
 
-    // Bind attributes
-    let position_attribute =
-        context.get_attrib_location(&program, "a_position") as u32;
-    let value_attribute =
-        context.get_attrib_location(&program, "a_value") as u32;
-
-    let color_map_uniform = context
-        .get_uniform_location(&program, "u_color_map")
-        .unwrap();
-
-    // - Main triangles
-    context.bind_vertex_array(Some(&vao_triangles));
-
+    context.enable_vertex_attrib_array(position_attribute);
     context.vertex_attrib_pointer_with_i32(
         position_attribute,
         FLOATS_PER_POSITION,
@@ -321,33 +343,37 @@ pub fn start_for_real(
         FLOATS_PER_VERTEX * BYTES_PER_FLOAT,
         0,
     );
-    context.enable_vertex_attrib_array(position_attribute);
-
-    context.vertex_attrib_pointer_with_i32(
-        value_attribute,
-        FLOATS_PER_VALUE,
-        WebGl2RenderingContext::FLOAT,
-        false,
-        FLOATS_PER_VERTEX * BYTES_PER_FLOAT,
-        FLOATS_PER_POSITION * BYTES_PER_FLOAT,
-    );
-    context.enable_vertex_attrib_array(value_attribute);
-
-    // - Mesh of main triangles (note: constant value)
-    context.bind_vertex_array(Some(&vao_lines));
-
-    context.vertex_attrib_pointer_with_i32(
-        position_attribute,
-        FLOATS_PER_POSITION,
-        WebGl2RenderingContext::FLOAT,
-        false,
-        FLOATS_PER_VERTEX * BYTES_PER_FLOAT,
-        0,
-    );
-    context.enable_vertex_attrib_array(position_attribute);
 
     // TODO: Use alternative vertex shader with a color uniform instead of a value attribute
     context.vertex_attrib1f(value_attribute, 0.0);
+
+    context.bind_vertex_array(None);
+
+    // Init: setup VertexArrayObject for isolines
+    let vao_isolines = context
+        .create_vertex_array()
+        .ok_or("Could not create vertex array object")?;
+    context.bind_vertex_array(Some(&vao_isolines));
+
+    context.bind_buffer(
+        WebGl2RenderingContext::ARRAY_BUFFER,
+        Some(&isoline_vertex_buffer),
+    );
+
+    context.enable_vertex_attrib_array(position_attribute);
+    context.vertex_attrib_pointer_with_i32(
+        position_attribute,
+        FLOATS_PER_POSITION,
+        WebGl2RenderingContext::FLOAT,
+        false,
+        FLOATS_PER_VERTEX * BYTES_PER_FLOAT,
+        0,
+    );
+
+    // TODO: Use alternative vertex shader with a color uniform instead of a value attribute
+    context.vertex_attrib1f(value_attribute, 0.0);
+
+    context.bind_vertex_array(None);
 
     // UI
     let show_mesh = Rc::new(Cell::new(false));
@@ -449,11 +475,13 @@ pub fn start_for_real(
     let mesh = Rc::new(RefCell::new(TriangleMesh::new()));
 
     // TODO: Remove this debugging code
-    mesh.borrow_mut().vertices = build_vertex_data(4, 4, 0.0);
-    mesh.borrow_mut().indices = build_index_data(4, 4);
-    let msg =
-        format!("{:#?}", mesh.borrow().iter_triangles().collect::<Vec<_>>());
-    web_sys::console::log_1(&msg.into());
+    //    mesh.borrow_mut().vertices = build_vertex_data(4, 4, 0.0);
+    //    mesh.borrow_mut().indices = build_index_data(4, 4);
+    //    let msg =
+    //        format!("{:#?}", mesh.borrow().iter_triangles().collect::<Vec<_>>());
+    //    web_sys::console::log_1(&msg.into());
+    //    let msg = format!("{:#?}", make_isolines(&mesh.borrow(), 0.5));
+    //    web_sys::console::log_1(&msg.into());
 
     let mut frame = 0;
     *g.borrow_mut() = Some(Closure::new(move || {
@@ -521,6 +549,26 @@ pub fn start_for_real(
             );
         }
 
+        // Build and upload vertex data for isolines
+        let isoline_vertex_data = make_isolines(&mesh.borrow(), 0.5);
+        context.bind_buffer(
+            WebGl2RenderingContext::ARRAY_BUFFER,
+            Some(&isoline_vertex_buffer),
+        );
+        unsafe {
+            // SAFETY: We're creating a view directly into memory, which might
+            // become invalid if we're doing any allocations after this. The
+            // view is used immediately to copy data into a GPU buffer, after
+            // which it is discarded.
+            let isoline_vertex_data_array_buf_view =
+                js_sys::Uint8Array::view(isoline_vertex_data.as_u8_slice());
+            context.buffer_data_with_array_buffer_view(
+                WebGl2RenderingContext::ARRAY_BUFFER,
+                &isoline_vertex_data_array_buf_view,
+                WebGl2RenderingContext::DYNAMIC_DRAW,
+            );
+        }
+
         // Update color map if the selected one changed
         if color_map_name_changed.get() {
             color_map_name_changed.set(false);
@@ -560,6 +608,13 @@ pub fn start_for_real(
                 0,
             );
         }
+
+        context.bind_vertex_array(Some(&vao_isolines));
+        context.draw_arrays(
+            WebGl2RenderingContext::LINES,
+            0,
+            isoline_vertex_data.len() as i32,
+        );
 
         context.bind_vertex_array(None);
 
