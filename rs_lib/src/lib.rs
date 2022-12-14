@@ -12,7 +12,7 @@ use web_sys::{WebGl2RenderingContext, WebGlProgram, WebGlShader};
 
 mod color_maps;
 
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug)]
 #[repr(C)]
 struct Vertex {
     x: f32,
@@ -120,6 +120,32 @@ impl TriangleMesh {
     ) -> TriangleStripIter<'_, std::slice::Iter<'_, u32>> {
         TriangleStripIter::new(&self.vertices, self.indices.iter())
     }
+}
+
+fn make_isolines(mesh: &TriangleMesh, threshold: f32) -> Vec<Vertex> {
+    let mut isoline_vertices = vec![];
+
+    for triangle in mesh.iter_triangles() {
+        let Triangle(&v0, &v1, &v2) = triangle;
+
+        match (v0.v > threshold, v1.v > threshold, v2.v > threshold) {
+            (true, true, true) | (false, false, false) => {}
+            (true, true, false) | (false, false, true) => {
+                isoline_vertices.push((v0).mix(v2, 0.5));
+                isoline_vertices.push((v1).mix(v2, 0.5));
+            }
+            (true, false, true) | (false, true, false) => {
+                isoline_vertices.push((v0).mix(v1, 0.5));
+                isoline_vertices.push((v2).mix(v1, 0.5));
+            }
+            (true, false, false) | (false, true, true) => {
+                isoline_vertices.push((v1).mix(v0, 0.5));
+                isoline_vertices.push((v2).mix(v0, 0.5));
+            }
+        }
+    }
+
+    isoline_vertices
 }
 
 trait VecExt<T>
