@@ -12,6 +12,12 @@ use web_sys::{WebGl2RenderingContext, WebGlProgram, WebGlShader};
 
 mod color_maps;
 
+const BYTES_PER_FLOAT: i32 = 4;
+
+const FLOATS_PER_POSITION: i32 = 2;
+const FLOATS_PER_VALUE: i32 = 1;
+const FLOATS_PER_VERTEX: i32 = FLOATS_PER_POSITION + FLOATS_PER_VALUE;
+
 #[derive(Clone, Copy, Debug)]
 #[repr(C)]
 struct Vertex {
@@ -162,6 +168,66 @@ impl<T> VecExt<T> for Vec<T> {
     }
 }
 
+/// The function to plot.
+fn f(x: f32, y: f32, t: f32) -> f32 {
+    ((x * y * 10.0 + t).sin() + 1.0) / 2.0
+}
+
+/// Builds the lattice of vertices used by the triangle mesh.
+fn build_vertex_data(x_len: i32, y_len: i32, t: f32) -> Vec<Vertex> {
+    let vertex_data_len = (x_len * y_len) as usize;
+    let mut vertex_data: Vec<Vertex> = Vec::with_capacity(vertex_data_len);
+
+    for y_idx in 0..y_len {
+        for x_idx in 0..x_len {
+            let x: f32 = (x_idx as f32 / (x_len - 1) as f32) * 2.0 - 1.0;
+            let y: f32 = (y_idx as f32 / (y_len - 1) as f32) * 2.0 - 1.0;
+            let v = f(x, y, t);
+
+            vertex_data.push(Vertex { x, y, v });
+        }
+    }
+
+    assert_eq!(vertex_data.len(), vertex_data_len);
+
+    vertex_data
+}
+
+/// Updates the values in the lattice of vertices used by the triangle mesh in-place.
+fn update_vertex_data(t: f32, vertex_data: &mut Vec<Vertex>) {
+    for vertex in vertex_data {
+        vertex.v = f(vertex.x, vertex.y, t);
+    }
+}
+
+/// Builds the list of indices (of vertices in the mesh) to be interpreted as a triangle strip by
+/// WebGL.
+fn build_index_data(x_len: i32, y_len: i32) -> Vec<u32> {
+    let index_data_len = 2 * (x_len * (y_len - 1) + (y_len - 2)) as usize;
+    let mut index_data: Vec<u32> = Vec::with_capacity(index_data_len);
+
+    for y in 0..(y_len - 1) {
+        if y > 0 {
+            // Degenerate begin: repeat first vertex
+            index_data.push((y * x_len) as u32);
+        }
+
+        for x in 0..x_len {
+            index_data.push(((y * x_len) + x) as u32);
+            index_data.push((((y + 1) * x_len) + x) as u32);
+        }
+
+        if y < y_len - 2 {
+            // Degenerate end: repeat last vertex
+            index_data.push((((y + 1) * x_len) + (x_len - 1)) as u32);
+        }
+    }
+
+    assert_eq!(index_data.len(), index_data_len);
+
+    index_data
+}
+
 #[wasm_bindgen]
 pub fn start(
     context: &WebGl2RenderingContext,
@@ -178,6 +244,11 @@ pub fn start_for_real(
 ) -> Result<(), JsValue> {
     let context = context.clone();
 
+    assert_eq!(
+        (BYTES_PER_FLOAT * FLOATS_PER_VERTEX) as usize,
+        mem::size_of::<Vertex>()
+    );
+
     let vert_shader = compile_shader(
         &context,
         WebGl2RenderingContext::VERTEX_SHADER,
@@ -192,73 +263,6 @@ pub fn start_for_real(
 
     let program = link_program(&context, &vert_shader, &frag_shader)?;
     context.use_program(Some(&program));
-
-    /// The function to plot
-    fn f(x: f32, y: f32, t: f32) -> f32 {
-        ((x * y * 10.0 + t).sin() + 1.0) / 2.0
-    }
-
-    const BYTES_PER_FLOAT: i32 = 4;
-
-    const FLOATS_PER_POSITION: i32 = 2;
-    const FLOATS_PER_VALUE: i32 = 1;
-    const FLOATS_PER_VERTEX: i32 = FLOATS_PER_POSITION + FLOATS_PER_VALUE;
-
-    assert_eq!(
-        (BYTES_PER_FLOAT * FLOATS_PER_VERTEX) as usize,
-        mem::size_of::<Vertex>()
-    );
-
-    fn build_vertex_data(x_len: i32, y_len: i32, t: f32) -> Vec<Vertex> {
-        let vertex_data_len = (x_len * y_len) as usize;
-        let mut vertex_data: Vec<Vertex> = Vec::with_capacity(vertex_data_len);
-
-        for y_idx in 0..y_len {
-            for x_idx in 0..x_len {
-                let x: f32 = (x_idx as f32 / (x_len - 1) as f32) * 2.0 - 1.0;
-                let y: f32 = (y_idx as f32 / (y_len - 1) as f32) * 2.0 - 1.0;
-                let v = f(x, y, t);
-
-                vertex_data.push(Vertex { x, y, v });
-            }
-        }
-
-        assert_eq!(vertex_data.len(), vertex_data_len);
-
-        vertex_data
-    }
-
-    fn update_vertex_data(t: f32, vertex_data: &mut Vec<Vertex>) {
-        for vertex in vertex_data {
-            vertex.v = f(vertex.x, vertex.y, t);
-        }
-    }
-
-    fn build_index_data(x_len: i32, y_len: i32) -> Vec<u32> {
-        let index_data_len = 2 * (x_len * (y_len - 1) + (y_len - 2)) as usize;
-        let mut index_data: Vec<u32> = Vec::with_capacity(index_data_len);
-
-        for y in 0..(y_len - 1) {
-            if y > 0 {
-                // Degenerate begin: repeat first vertex
-                index_data.push((y * x_len) as u32);
-            }
-
-            for x in 0..x_len {
-                index_data.push(((y * x_len) + x) as u32);
-                index_data.push((((y + 1) * x_len) + x) as u32);
-            }
-
-            if y < y_len - 2 {
-                // Degenerate end: repeat last vertex
-                index_data.push((((y + 1) * x_len) + (x_len - 1)) as u32);
-            }
-        }
-
-        assert_eq!(index_data.len(), index_data_len);
-
-        index_data
-    }
 
     // Buffers that will hold vertex and index data
     let vertex_buffer =
