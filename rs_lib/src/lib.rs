@@ -397,6 +397,8 @@ pub fn start_for_real(
     let resolution = Rc::new(Cell::new(7i32));
     let resolution_changed = Rc::new(Cell::new(true));
 
+    let threshold = Rc::new(Cell::new(0.5));
+
     // Event listeners
     let document = web_sys::window().unwrap().document().unwrap();
 
@@ -473,6 +475,31 @@ pub fn start_for_real(
         let input = document
             .get_element_by_id("input-resolution")
             .expect("Element with ID #input-resolution");
+        input.add_event_listener_with_callback(
+            "input",
+            closure.as_ref().unchecked_ref(),
+        )?;
+        closure.forget();
+    }
+
+    {
+        let threshold = threshold.clone();
+        let closure =
+            Closure::<dyn FnMut(_)>::new(move |event: web_sys::InputEvent| {
+                threshold.set(
+                    event
+                        .current_target()
+                        .unwrap()
+                        .dyn_into::<web_sys::HtmlInputElement>()
+                        .unwrap()
+                        .value()
+                        .parse()
+                        .unwrap(),
+                );
+            });
+        let input = document
+            .get_element_by_id("input-threshold")
+            .expect("Element with ID #input-threshold");
         input.add_event_listener_with_callback(
             "input",
             closure.as_ref().unchecked_ref(),
@@ -562,7 +589,8 @@ pub fn start_for_real(
         }
 
         // Build and upload vertex data for isolines
-        let isoline_vertex_data = make_isolines(&mesh.borrow(), 0.5);
+        let isoline_vertex_data =
+            make_isolines(&mesh.borrow(), threshold.get());
         context.bind_buffer(
             WebGl2RenderingContext::ARRAY_BUFFER,
             Some(&isoline_vertex_buffer),

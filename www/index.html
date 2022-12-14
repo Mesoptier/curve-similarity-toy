@@ -39,5 +39,18 @@
         >
         <code><output id="output-resolution">128 (2^7)</output></code>
     </div>
+    <div>
+        Contour threshold:
+        <input
+            id="input-threshold"
+            type="range"
+            value="0.5"
+            min="0"
+            max="1"
+            step="0.01"
+            oninput="document.getElementById('output-threshold').innerHTML = this.value;"
+        >
+        <code><output id="output-threshold">0.5</output></code>
+    </div>
 </body>
 </html>
