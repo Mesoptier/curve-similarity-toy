@@ -2,8 +2,8 @@
 # Manual changes might be lost - proceed with caution!
 
 __metadata:
-  version: 6
-  cacheKey: 8
+  version: 7
+  cacheKey: 9
 
 "@esbuild/android-arm64@npm:0.16.1":
   version: 0.16.1
@@ -159,12 +159,58 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@types/prop-types@npm:*":
+  version: 15.7.5
+  resolution: "@types/prop-types@npm:15.7.5"
+  checksum: a6e04a01e1f632cc3fa5fffd79779f2f83a8fec1293cdf29b5a02aa4e1a1b38a124e824205a40de4e66532a0fa33c4f60337b55cec635080ea2571e55910460f
+  languageName: node
+  linkType: hard
+
+"@types/react-dom@npm:^18.0.9":
+  version: 18.0.9
+  resolution: "@types/react-dom@npm:18.0.9"
+  dependencies:
+    "@types/react": "npm:*"
+  checksum: 0fb1a4cc5215dd032ad0051c3365be8c9b36637ea36854f5b1cce84e858cbde67b08a74229032dac6e522ecd3181f1d5cccd264ff12f926c21c8a7cccac8d525
+  languageName: node
+  linkType: hard
+
+"@types/react@npm:*, @types/react@npm:^18.0.26":
+  version: 18.0.26
+  resolution: "@types/react@npm:18.0.26"
+  dependencies:
+    "@types/prop-types": "npm:*"
+    "@types/scheduler": "npm:*"
+    csstype: "npm:^3.0.2"
+  checksum: b2520e54786585b9fdb6fa3cbb92cbd05a0f0951ec3480ed71f320dbd41e0d663d6582fe34bf0e590047917f51b9205a33b40a1986340d002501ffef58f5fbe4
+  languageName: node
+  linkType: hard
+
+"@types/scheduler@npm:*":
+  version: 0.16.2
+  resolution: "@types/scheduler@npm:0.16.2"
+  checksum: 223d9b12d1eff3fe857e7eb967d640707c2a76ba1126633bae88dce7693301ea8edcce83586a17134a1822f01265f715809860085547b01db8de6a90f5165706
+  languageName: node
+  linkType: hard
+
+"csstype@npm:^3.0.2":
+  version: 3.1.1
+  resolution: "csstype@npm:3.1.1"
+  checksum: 39c4533f337cad38b9574a24b4b94bb203f091882295b6b4fb27e9e2b17148b188847f5fb728796af60bd0b80c502d510f89fe7ada3b661eaa6bca758c902036
+  languageName: node
+  linkType: hard
+
 "curve-similarity-toy@workspace:.":
   version: 0.0.0-use.local
   resolution: "curve-similarity-toy@workspace:."
   dependencies:
-    esbuild: ^0.16.1
-    typescript: ^4.9.4
+    "@types/react": "npm:^18.0.26"
+    "@types/react-dom": "npm:^18.0.9"
+    esbuild: "npm:^0.16.1"
+    react: "npm:^18.2.0"
+    react-dom: "npm:^18.2.0"
+    tsc: "npm:^2.0.4"
+    typescript: "npm:^4.9.4"
   languageName: unknown
   linkType: soft
 
@@ -172,28 +218,28 @@ __metadata:
   version: 0.16.1
   resolution: "esbuild@npm:0.16.1"
   dependencies:
-    "@esbuild/android-arm": 0.16.1
-    "@esbuild/android-arm64": 0.16.1
-    "@esbuild/android-x64": 0.16.1
-    "@esbuild/darwin-arm64": 0.16.1
-    "@esbuild/darwin-x64": 0.16.1
-    "@esbuild/freebsd-arm64": 0.16.1
-    "@esbuild/freebsd-x64": 0.16.1
-    "@esbuild/linux-arm": 0.16.1
-    "@esbuild/linux-arm64": 0.16.1
-    "@esbuild/linux-ia32": 0.16.1
-    "@esbuild/linux-loong64": 0.16.1
-    "@esbuild/linux-mips64el": 0.16.1
-    "@esbuild/linux-ppc64": 0.16.1
-    "@esbuild/linux-riscv64": 0.16.1
-    "@esbuild/linux-s390x": 0.16.1
-    "@esbuild/linux-x64": 0.16.1
-    "@esbuild/netbsd-x64": 0.16.1
-    "@esbuild/openbsd-x64": 0.16.1
-    "@esbuild/sunos-x64": 0.16.1
-    "@esbuild/win32-arm64": 0.16.1
-    "@esbuild/win32-ia32": 0.16.1
-    "@esbuild/win32-x64": 0.16.1
+    "@esbuild/android-arm": "npm:0.16.1"
+    "@esbuild/android-arm64": "npm:0.16.1"
+    "@esbuild/android-x64": "npm:0.16.1"
+    "@esbuild/darwin-arm64": "npm:0.16.1"
+    "@esbuild/darwin-x64": "npm:0.16.1"
+    "@esbuild/freebsd-arm64": "npm:0.16.1"
+    "@esbuild/freebsd-x64": "npm:0.16.1"
+    "@esbuild/linux-arm": "npm:0.16.1"
+    "@esbuild/linux-arm64": "npm:0.16.1"
+    "@esbuild/linux-ia32": "npm:0.16.1"
+    "@esbuild/linux-loong64": "npm:0.16.1"
+    "@esbuild/linux-mips64el": "npm:0.16.1"
+    "@esbuild/linux-ppc64": "npm:0.16.1"
+    "@esbuild/linux-riscv64": "npm:0.16.1"
+    "@esbuild/linux-s390x": "npm:0.16.1"
+    "@esbuild/linux-x64": "npm:0.16.1"
+    "@esbuild/netbsd-x64": "npm:0.16.1"
+    "@esbuild/openbsd-x64": "npm:0.16.1"
+    "@esbuild/sunos-x64": "npm:0.16.1"
+    "@esbuild/win32-arm64": "npm:0.16.1"
+    "@esbuild/win32-ia32": "npm:0.16.1"
+    "@esbuild/win32-x64": "npm:0.16.1"
   dependenciesMeta:
     "@esbuild/android-arm":
       optional: true
@@ -241,7 +287,64 @@ __metadata:
       optional: true
   bin:
     esbuild: bin/esbuild
-  checksum: 0644b31f0f7993fe2e9141e2f1a63f84dcd1bbc2f9652b07418d7c3a3631fcbfdf0b70c456f6ca5b33044850cf408deacef3e51e164420bf855cbbbbb7c9cd76
+  checksum: 73ac4a45e8ec382ba26b1df13fc6a054ef53f26e0a1e673932d28640d8ee804b0a6db16031f3b2d5d204184313bb4067c3e20c4ff04f2cd020f47043a54cdc20
+  languageName: node
+  linkType: hard
+
+"js-tokens@npm:^3.0.0 || ^4.0.0":
+  version: 4.0.0
+  resolution: "js-tokens@npm:4.0.0"
+  checksum: 47d1c18dc6b9eed4baf1db3d81b36feb95b463201c82ffce0d7a4d65ede596ba97d6ac2468974199705db9ef8a3433606af41fc7bbe7cb25c1dd601785413d9b
+  languageName: node
+  linkType: hard
+
+"loose-envify@npm:^1.1.0":
+  version: 1.4.0
+  resolution: "loose-envify@npm:1.4.0"
+  dependencies:
+    js-tokens: "npm:^3.0.0 || ^4.0.0"
+  bin:
+    loose-envify: cli.js
+  checksum: 39c5fc44c6a8f7f8a92cccf174554fbb307477ef493760407920fdd4ed5f6cc1aec5b6a5ab3c3767ef79547b3e1aea09d8ca08d773232c662d910cfe473a0590
+  languageName: node
+  linkType: hard
+
+"react-dom@npm:^18.2.0":
+  version: 18.2.0
+  resolution: "react-dom@npm:18.2.0"
+  dependencies:
+    loose-envify: "npm:^1.1.0"
+    scheduler: "npm:^0.23.0"
+  peerDependencies:
+    react: ^18.2.0
+  checksum: 7c5b915fb793d63563cec1f721e059e6ff0e2855ac116ab5cb7450b6c59398f5e25f95c960ce5cb93504cc58ab724a75a78e99282354e702a0e667d0d787d028
+  languageName: node
+  linkType: hard
+
+"react@npm:^18.2.0":
+  version: 18.2.0
+  resolution: "react@npm:18.2.0"
+  dependencies:
+    loose-envify: "npm:^1.1.0"
+  checksum: 8434e5782c52b3bf18a80b666348977924ee3827895fa03ec3ffb9faca90c460049f14130428dd1546bab6cf3b2c277f2c243d3c2a856501331d2e69c24b2bb9
+  languageName: node
+  linkType: hard
+
+"scheduler@npm:^0.23.0":
+  version: 0.23.0
+  resolution: "scheduler@npm:0.23.0"
+  dependencies:
+    loose-envify: "npm:^1.1.0"
+  checksum: f4022b95cdc282668643da4850f55fe70c899aa956d11819f196e2ca892271bdb253613e53997852094f9351f7c72d057eea8b28d9b4bcb93bcb1c6d09985c82
+  languageName: node
+  linkType: hard
+
+"tsc@npm:^2.0.4":
+  version: 2.0.4
+  resolution: "tsc@npm:2.0.4"
+  bin:
+    tsc: bin/tsc
+  checksum: e99a9bce344bb71f20b5327065371e628802a5453d2978f68fc75f061ea1f8f7010c32166d7313e65ab0c7fb38b603fc91435f5f02e7e3fe6e1cbaf33b0568a8
   languageName: node
   linkType: hard
 
@@ -251,16 +354,16 @@ __metadata:
   bin:
     tsc: bin/tsc
     tsserver: bin/tsserver
-  checksum: e782fb9e0031cb258a80000f6c13530288c6d63f1177ed43f770533fdc15740d271554cdae86701c1dd2c83b082cea808b07e97fd68b38a172a83dbf9e0d0ef9
+  checksum: b142d5e50785d0e5055771e4d9e712b01be58985ff29be3d3acc64f0fddd5fd8ade8b28583ba502f2565783c23bd5b509c5abcc1a93a2d7d4f05b8e4ee731fc9
   languageName: node
   linkType: hard
 
-"typescript@patch:typescript@^4.9.4#~builtin<compat/typescript>":
+"typescript@patch:typescript@npm%3A^4.9.4#optional!builtin<compat/typescript>":
   version: 4.9.4
-  resolution: "typescript@patch:typescript@npm%3A4.9.4#~builtin<compat/typescript>::version=4.9.4&hash=d73830"
+  resolution: "typescript@patch:typescript@npm%3A4.9.4#optional!builtin<compat/typescript>::version=4.9.4&hash=ad5954"
   bin:
     tsc: bin/tsc
     tsserver: bin/tsserver
-  checksum: 37f6e2c3c5e2aa5934b85b0fddbf32eeac8b1bacf3a5b51d01946936d03f5377fe86255d4e5a4ae628fd0cd553386355ad362c57f13b4635064400f3e8e05b9d
+  checksum: e7321aeb1e2c0e3c19599808707208e2b730de8d17a5624f0a7297b9a1ffa39974edd4a819108b3b635bc00171476ddfa339e04d928a03ce8d8c6944cb8ec008
   languageName: node
   linkType: hard

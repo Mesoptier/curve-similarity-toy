@@ -3,7 +3,7 @@ import esbuild from 'esbuild';
 const watch = process.argv.includes('--watch');
 
 esbuild.build({
-    entryPoints: ['./src/main.ts'],
+    entryPoints: ['./src/main.tsx'],
     outdir: 'www/build',
     format: "esm",
     bundle: true,
