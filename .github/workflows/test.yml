@@ -5,6 +5,7 @@ on:
   workflow_dispatch:
 
 jobs:
+  # Test job
   test:
     runs-on: ubuntu-latest
     steps:
@@ -15,9 +16,16 @@ jobs:
         with:
           node-version: '17'
           cache: 'yarn'
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@v2.2.0
 
       - name: Install yarn dependencies
         run: yarn install --immutable
+      - name: Install wasm-pack
+        uses: jetli/wasm-pack-action@v0.4.0
+
+      - name: Build Wasm
+        run: yarn run build:wasm
 
       - name: Check Prettier
         run: yarn test:prettier

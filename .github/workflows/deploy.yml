@@ -3,9 +3,9 @@ name: Deploy
 on:
   # Deploy after tests have successfully completed on the main branch
   workflow_run:
-    workflows: [Test]
-    types: [completed]
-    branches: [main]
+    workflows: [ Test ]
+    types: [ completed ]
+    branches: [ main ]
 
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
@@ -28,25 +28,25 @@ jobs:
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v3  
+        uses: actions/checkout@v3
       - name: Setup Node
         uses: actions/setup-node@v3
         with:
           node-version: '17'
           cache: 'yarn'
-      - name: Rust Cache 
+      - name: Rust Cache
         uses: Swatinem/rust-cache@v2.2.0
 
       - name: Install yarn dependencies
         run: yarn install --immutable
       - name: Install wasm-pack
         uses: jetli/wasm-pack-action@v0.4.0
-        
-      - name: Build Rust
+
+      - name: Build Wasm
         run: yarn run build:wasm
       - name: Build TypeScript
         run: yarn run build
-        
+
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v1
         with:
