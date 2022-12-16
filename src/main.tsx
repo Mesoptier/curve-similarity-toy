@@ -17,4 +17,8 @@ init(new URL(wasmFilePath, import.meta.url)).then(() => {
 const container = document.getElementById('container');
 const root = createRoot(container);
 
-root.render(<StrictMode><App /></StrictMode>);
+root.render(
+    <StrictMode>
+        <App />
+    </StrictMode>,
+);
