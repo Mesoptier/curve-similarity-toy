@@ -1,9 +1,5 @@
-import { Fragment, useState } from 'react';
-
-type Point = { x: number; y: number };
-type Curve = Point[];
-
-const CURVE_COLORS = ['red', 'yellow'];
+import { type Dispatch, Fragment, type SetStateAction } from 'react';
+import { type Curve, CURVE_COLORS } from '../curves';
 
 function makePathDefinition(curve: Curve): string {
     if (curve.length === 0) {
@@ -13,8 +9,13 @@ function makePathDefinition(curve: Curve): string {
     return 'M' + curve.map(({ x, y }) => `${x},${y}`).join(' ');
 }
 
-export function CurveSpaceView(): JSX.Element {
-    const [curves, setCurves] = useState<Curve[]>([[], []]);
+interface CurveSpaceViewProps {
+    curves: [Curve, Curve];
+    updateCurves: Dispatch<SetStateAction<Curve[]>>;
+}
+
+export function CurveSpaceView(props: CurveSpaceViewProps): JSX.Element {
+    const { curves, updateCurves } = props;
 
     return (
         <svg
@@ -27,9 +28,9 @@ export function CurveSpaceView(): JSX.Element {
                     y: e.clientY - e.currentTarget.getBoundingClientRect().y,
                 };
 
-                setCurves((curves) => {
+                updateCurves((curves) => {
                     curves = [...curves];
-                    curves[curveIdx].push(newPoint);
+                    curves[curveIdx] = [...curves[curveIdx], newPoint];
                     return curves;
                 });
             }}
