@@ -1,3 +1,5 @@
+import { CurveSpaceView } from './CurveSpaceView';
+
 export function App(): JSX.Element {
-    return <div>Hello, world!</div>;
+    return <CurveSpaceView />;
 }
