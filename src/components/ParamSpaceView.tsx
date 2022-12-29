@@ -49,25 +49,25 @@ export function ParamSpaceView(props: ParamSpaceViewProps): JSX.Element {
             height={height + 30}
             style={{ border: '1px solid gray' }}
         >
-            {cumulativeLengths2.map((y, pointIdx) => (
-                <circle
-                    key={pointIdx}
-                    cx={10}
-                    cy={y + 20}
-                    r={5}
-                    fill={CURVE_COLORS[1]}
-                />
-            ))}
             {cumulativeLengths1.map((x, pointIdx) => (
                 <circle
                     key={pointIdx}
                     cx={x + 20}
-                    cy={10}
+                    cy={height + 30 - 10}
                     r={5}
                     fill={CURVE_COLORS[0]}
                 />
             ))}
-            <foreignObject x={20} y={20} width={width} height={height}>
+            {cumulativeLengths2.map((y, pointIdx) => (
+                <circle
+                    key={pointIdx}
+                    cx={10}
+                    cy={height + 30 - (y + 20)}
+                    r={5}
+                    fill={CURVE_COLORS[1]}
+                />
+            ))}
+            <foreignObject x={20} y={10} width={width} height={height}>
                 <Plot curves={curves} width={width} height={height} />
             </foreignObject>
         </svg>
