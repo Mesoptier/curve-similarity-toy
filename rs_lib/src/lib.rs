@@ -3,15 +3,17 @@ use std::{
     ops::{Add, Mul},
 };
 
+use crate::geom::curve::Curve;
+use crate::geom::point::Point;
 use itertools::{Itertools, TupleWindows};
-use serde::{Deserialize, Serialize};
-use wasm_bindgen::prelude::*;
+use wasm_bindgen::{prelude::*, JsCast};
 use web_sys::{
     WebGl2RenderingContext, WebGlBuffer, WebGlProgram, WebGlShader,
     WebGlUniformLocation, WebGlVertexArrayObject,
 };
 
 mod color_maps;
+mod geom;
 
 const BYTES_PER_FLOAT: i32 = 4;
 
@@ -187,15 +189,24 @@ fn f(x: f32, y: f32, t: f32) -> f32 {
 }
 
 /// Builds the lattice of vertices used by the triangle mesh.
-fn build_vertex_data(x_len: i32, y_len: i32, t: f32) -> Vec<Vertex> {
+fn build_vertex_data<F: FnMut(f32, f32) -> f32>(
+    x_len: u32,
+    y_len: u32,
+    mut f: F,
+) -> Vec<Vertex> {
     let vertex_data_len = (x_len * y_len) as usize;
     let mut vertex_data: Vec<Vertex> = Vec::with_capacity(vertex_data_len);
 
     for y_idx in 0..y_len {
         for x_idx in 0..x_len {
-            let x: f32 = (x_idx as f32 / (x_len - 1) as f32) * 2.0 - 1.0;
-            let y: f32 = (y_idx as f32 / (y_len - 1) as f32) * 2.0 - 1.0;
-            let v = f(x, y, t);
+            let x: f32 = x_idx as f32 / (x_len - 1) as f32;
+            let y: f32 = y_idx as f32 / (y_len - 1) as f32;
+
+            // TODO: Scale x,y to curve lengths?
+            let v = f(x, y);
+
+            let x = x * 2.0 - 1.0;
+            let y = y * 2.0 - 1.0;
 
             vertex_data.push(Vertex { x, y, v });
         }
@@ -215,24 +226,24 @@ fn update_vertex_data(t: f32, vertex_data: &mut Vec<Vertex>) {
 
 /// Builds the list of indices (of vertices in the mesh) to be interpreted as a triangle strip by
 /// WebGL.
-fn build_index_data(x_len: i32, y_len: i32) -> Vec<u32> {
+fn build_index_data(x_len: u32, y_len: u32) -> Vec<u32> {
     let index_data_len = 2 * (x_len * (y_len - 1) + (y_len - 2)) as usize;
     let mut index_data: Vec<u32> = Vec::with_capacity(index_data_len);
 
     for y in 0..(y_len - 1) {
         if y > 0 {
             // Degenerate begin: repeat first vertex
-            index_data.push((y * x_len) as u32);
+            index_data.push((y * x_len));
         }
 
         for x in 0..x_len {
-            index_data.push(((y * x_len) + x) as u32);
-            index_data.push((((y + 1) * x_len) + x) as u32);
+            index_data.push(((y * x_len) + x));
+            index_data.push((((y + 1) * x_len) + x));
         }
 
         if y < y_len - 2 {
             // Degenerate end: repeat last vertex
-            index_data.push((((y + 1) * x_len) + (x_len - 1)) as u32);
+            index_data.push((((y + 1) * x_len) + (x_len - 1)));
         }
     }
 
@@ -241,20 +252,13 @@ fn build_index_data(x_len: i32, y_len: i32) -> Vec<u32> {
     index_data
 }
 
-#[derive(Serialize, Deserialize, Debug)]
-struct Point {
-    x: f32,
-    y: f32,
-}
-
-type Curve = Vec<Point>;
-
 #[wasm_bindgen(getter_with_clone)]
 pub struct Plotter {
     context: WebGl2RenderingContext,
-    curves: [Curve; 2],
+    curves: [Curve<f32>; 2],
 
     color_map_uniform: WebGlUniformLocation,
+    value_range_uniform: WebGlUniformLocation,
 
     vertex_buffer: WebGlBuffer,
     index_buffer: WebGlBuffer,
@@ -294,6 +298,9 @@ impl Plotter {
             context.get_attrib_location(&program, "a_value") as u32;
         let color_map_uniform = context
             .get_uniform_location(&program, "u_color_map")
+            .unwrap();
+        let value_range_uniform = context
+            .get_uniform_location(&program, "u_value_range")
             .unwrap();
 
         // Init: create buffers
@@ -399,9 +406,10 @@ impl Plotter {
 
         Ok(Self {
             context,
-            curves: [vec![], vec![]],
+            curves: [Curve::default(), Curve::default()],
 
             color_map_uniform,
+            value_range_uniform,
 
             vertex_buffer,
             index_buffer,
@@ -413,17 +421,34 @@ impl Plotter {
         })
     }
 
-    fn update_buffers(&self, x_len: i32, y_len: i32) {
+    fn update_buffers(&self, x_len: u32, y_len: u32) {
         let mut mesh = TriangleMesh::new();
 
-        let t = 0.;
         let isoline_threshold = 0.5;
 
+        let mut min_v = f32::INFINITY;
+        let mut max_v = f32::NEG_INFINITY;
+
         // Rebuild vertex data
-        mesh.vertices = build_vertex_data(x_len, y_len, t);
+        mesh.vertices = build_vertex_data(x_len, y_len, |x, y| {
+            let [c1, c2] = &self.curves;
+
+            let p1 = c1.at(x * c1.total_length());
+            let p2 = c2.at(y * c2.total_length());
+            let v = p1.dist(&p2);
+
+            min_v = min_v.min(v);
+            max_v = max_v.max(v);
+
+            v
+        });
 
         // Rebuild index data
         mesh.indices = build_index_data(x_len, y_len);
+
+        // Upload min/max values range
+        self.context
+            .uniform2f(Some(&self.value_range_uniform), min_v, max_v);
 
         // Upload updated vertex data
         self.context.bind_buffer(
@@ -487,9 +512,15 @@ impl Plotter {
     pub fn draw(&self) {
         let context = &self.context;
 
-        let resolution = 128;
-        let x_len = resolution;
-        let y_len = resolution;
+        let canvas: web_sys::HtmlCanvasElement = context
+            .canvas()
+            .unwrap()
+            .dyn_into::<web_sys::HtmlCanvasElement>()
+            .unwrap();
+
+        let res = 8;
+        let x_len = canvas.width() / res;
+        let y_len = canvas.height() / res;
 
         self.update_buffers(x_len, y_len);
 
@@ -532,9 +563,9 @@ impl Plotter {
     }
 
     pub fn update_curves(&mut self, curves: JsValue) {
-        let curves: [Curve; 2] =
+        let curves: [Vec<Point<f32>>; 2] =
             serde_wasm_bindgen::from_value(curves).unwrap();
-        self.curves = curves;
+        self.curves = curves.map(Curve::from_points);
     }
 
     pub fn resize(&self, width: i32, height: i32) {
