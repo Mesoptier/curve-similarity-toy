@@ -29,6 +29,17 @@ function computeCumulativeLengths(curve: Curve): number[] {
     });
 }
 
+function makeGridLines(xCoords: number[], yCoords: number[]): string {
+    const verticalLines = xCoords
+        .map((x) => `M${x} ${yCoords[0]}V${yCoords[yCoords.length - 1]}`)
+        .join('');
+    const horizontalLines = yCoords
+        .map((y) => `M${xCoords[0]} ${y}H${xCoords[xCoords.length - 1]}`)
+        .join('');
+
+    return verticalLines + horizontalLines;
+}
+
 export function ParamSpaceView(props: ParamSpaceViewProps): JSX.Element {
     const { curves } = props;
 
@@ -70,6 +81,12 @@ export function ParamSpaceView(props: ParamSpaceViewProps): JSX.Element {
             <foreignObject x={20} y={10} width={width} height={height}>
                 <Plot curves={curves} width={width} height={height} />
             </foreignObject>
+            <path
+                transform={`translate(20, ${height + 30 - 20}) scale(1, -1)`}
+                d={makeGridLines(cumulativeLengths1, cumulativeLengths2)}
+                fill="none"
+                stroke="white"
+            />
         </svg>
     );
 }
