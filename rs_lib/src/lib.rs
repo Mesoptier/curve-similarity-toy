@@ -1,14 +1,15 @@
 use std::{
-    cell::{Cell, RefCell},
     mem,
     ops::{Add, Mul},
-    rc::Rc,
 };
 
 use itertools::{Itertools, TupleWindows};
+use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::*;
-use wasm_bindgen::JsCast;
-use web_sys::{WebGl2RenderingContext, WebGlProgram, WebGlShader};
+use web_sys::{
+    WebGl2RenderingContext, WebGlBuffer, WebGlProgram, WebGlShader,
+    WebGlUniformLocation, WebGlVertexArrayObject,
+};
 
 mod color_maps;
 
@@ -240,6 +241,308 @@ fn build_index_data(x_len: i32, y_len: i32) -> Vec<u32> {
     index_data
 }
 
+#[derive(Serialize, Deserialize, Debug)]
+struct Point {
+    x: f32,
+    y: f32,
+}
+
+type Curve = Vec<Point>;
+
+#[wasm_bindgen(getter_with_clone)]
+pub struct Plotter {
+    context: WebGl2RenderingContext,
+    curves: [Curve; 2],
+
+    color_map_uniform: WebGlUniformLocation,
+
+    vertex_buffer: WebGlBuffer,
+    index_buffer: WebGlBuffer,
+    isoline_vertex_buffer: WebGlBuffer,
+
+    vao_triangles: WebGlVertexArrayObject,
+    vao_lines: WebGlVertexArrayObject,
+    vao_isolines: WebGlVertexArrayObject,
+}
+
+#[wasm_bindgen]
+impl Plotter {
+    #[wasm_bindgen(constructor)]
+    pub fn new(context: &WebGl2RenderingContext) -> Result<Plotter, JsValue> {
+        let context = context.clone();
+
+        // Init: compiler shaders
+        let vert_shader = compile_shader(
+            &context,
+            WebGl2RenderingContext::VERTEX_SHADER,
+            include_str!("shader.vert"),
+        )?;
+        let frag_shader = compile_shader(
+            &context,
+            WebGl2RenderingContext::FRAGMENT_SHADER,
+            include_str!("shader.frag"),
+        )?;
+
+        // Init: create & link program
+        let program = link_program(&context, &vert_shader, &frag_shader)?;
+        context.use_program(Some(&program));
+
+        // Init: get attributes and uniforms
+        let position_attribute =
+            context.get_attrib_location(&program, "a_position") as u32;
+        let value_attribute =
+            context.get_attrib_location(&program, "a_value") as u32;
+        let color_map_uniform = context
+            .get_uniform_location(&program, "u_color_map")
+            .unwrap();
+
+        // Init: create buffers
+        let vertex_buffer =
+            context.create_buffer().ok_or("Failed to create buffer")?;
+        let index_buffer =
+            context.create_buffer().ok_or("Failed to create buffer")?;
+        let isoline_vertex_buffer =
+            context.create_buffer().ok_or("Failed to create buffer")?;
+
+        // Init: setup VertexArrayObject for main triangle mesh
+        let vao_triangles = context
+            .create_vertex_array()
+            .ok_or("Could not create vertex array object")?;
+        context.bind_vertex_array(Some(&vao_triangles));
+
+        context.bind_buffer(
+            WebGl2RenderingContext::ARRAY_BUFFER,
+            Some(&vertex_buffer),
+        );
+        context.bind_buffer(
+            WebGl2RenderingContext::ELEMENT_ARRAY_BUFFER,
+            Some(&index_buffer),
+        );
+
+        context.enable_vertex_attrib_array(position_attribute);
+        context.vertex_attrib_pointer_with_i32(
+            position_attribute,
+            FLOATS_PER_POSITION,
+            WebGl2RenderingContext::FLOAT,
+            false,
+            FLOATS_PER_VERTEX * BYTES_PER_FLOAT,
+            0,
+        );
+
+        context.enable_vertex_attrib_array(value_attribute);
+        context.vertex_attrib_pointer_with_i32(
+            value_attribute,
+            FLOATS_PER_VALUE,
+            WebGl2RenderingContext::FLOAT,
+            false,
+            FLOATS_PER_VERTEX * BYTES_PER_FLOAT,
+            FLOATS_PER_POSITION * BYTES_PER_FLOAT,
+        );
+
+        context.bind_vertex_array(None);
+
+        // Init: setup VertexArrayObject for mesh lines of main triangle mesh
+        let vao_lines = context
+            .create_vertex_array()
+            .ok_or("Could not create vertex array object")?;
+        context.bind_vertex_array(Some(&vao_lines));
+
+        context.bind_buffer(
+            WebGl2RenderingContext::ARRAY_BUFFER,
+            Some(&vertex_buffer),
+        );
+        context.bind_buffer(
+            WebGl2RenderingContext::ELEMENT_ARRAY_BUFFER,
+            Some(&index_buffer),
+        );
+
+        context.enable_vertex_attrib_array(position_attribute);
+        context.vertex_attrib_pointer_with_i32(
+            position_attribute,
+            FLOATS_PER_POSITION,
+            WebGl2RenderingContext::FLOAT,
+            false,
+            FLOATS_PER_VERTEX * BYTES_PER_FLOAT,
+            0,
+        );
+
+        // TODO: Use alternative vertex shader with a color uniform instead of a value attribute
+        context.vertex_attrib1f(value_attribute, 0.0);
+
+        context.bind_vertex_array(None);
+
+        // Init: setup VertexArrayObject for isolines
+        let vao_isolines = context
+            .create_vertex_array()
+            .ok_or("Could not create vertex array object")?;
+        context.bind_vertex_array(Some(&vao_isolines));
+
+        context.bind_buffer(
+            WebGl2RenderingContext::ARRAY_BUFFER,
+            Some(&isoline_vertex_buffer),
+        );
+
+        context.enable_vertex_attrib_array(position_attribute);
+        context.vertex_attrib_pointer_with_i32(
+            position_attribute,
+            FLOATS_PER_POSITION,
+            WebGl2RenderingContext::FLOAT,
+            false,
+            FLOATS_PER_VERTEX * BYTES_PER_FLOAT,
+            0,
+        );
+
+        // TODO: Use alternative vertex shader with a color uniform instead of a value attribute
+        context.vertex_attrib1f(value_attribute, 0.0);
+
+        context.bind_vertex_array(None);
+
+        Ok(Self {
+            context,
+            curves: [vec![], vec![]],
+
+            color_map_uniform,
+
+            vertex_buffer,
+            index_buffer,
+            isoline_vertex_buffer,
+
+            vao_triangles,
+            vao_lines,
+            vao_isolines,
+        })
+    }
+
+    fn update_buffers(&self, x_len: i32, y_len: i32) {
+        let mut mesh = TriangleMesh::new();
+
+        let t = 0.;
+        let isoline_threshold = 0.5;
+
+        // Rebuild vertex data
+        mesh.vertices = build_vertex_data(x_len, y_len, t);
+
+        // Rebuild index data
+        mesh.indices = build_index_data(x_len, y_len);
+
+        // Upload updated vertex data
+        self.context.bind_buffer(
+            WebGl2RenderingContext::ARRAY_BUFFER,
+            Some(&self.vertex_buffer),
+        );
+        unsafe {
+            // SAFETY: We're creating a view directly into memory, which might
+            // become invalid if we're doing any allocations after this. The
+            // view is used immediately to copy data into a GPU buffer, after
+            // which it is discarded.
+            let vertex_data_array_buf_view =
+                js_sys::Uint8Array::view(mesh.vertices.as_u8_slice());
+            self.context.buffer_data_with_array_buffer_view(
+                WebGl2RenderingContext::ARRAY_BUFFER,
+                &vertex_data_array_buf_view,
+                WebGl2RenderingContext::DYNAMIC_DRAW,
+            );
+        }
+
+        // Upload updated index data
+        self.context.bind_buffer(
+            WebGl2RenderingContext::ELEMENT_ARRAY_BUFFER,
+            Some(&self.index_buffer),
+        );
+        unsafe {
+            // SAFETY: We're creating a view directly into memory, which might
+            // become invalid if we're doing any allocations after this. The
+            // view is used immediately to copy data into a GPU buffer, after
+            // which it is discarded.
+            let index_data_array_buf_view =
+                js_sys::Uint8Array::view(mesh.indices.as_u8_slice());
+            self.context.buffer_data_with_array_buffer_view(
+                WebGl2RenderingContext::ELEMENT_ARRAY_BUFFER,
+                &index_data_array_buf_view,
+                WebGl2RenderingContext::STATIC_DRAW,
+            )
+        }
+
+        // Build and upload vertex data for isolines
+        let isoline_vertex_data = make_isolines(&mesh, isoline_threshold);
+        self.context.bind_buffer(
+            WebGl2RenderingContext::ARRAY_BUFFER,
+            Some(&self.isoline_vertex_buffer),
+        );
+        unsafe {
+            // SAFETY: We're creating a view directly into memory, which might
+            // become invalid if we're doing any allocations after this. The
+            // view is used immediately to copy data into a GPU buffer, after
+            // which it is discarded.
+            let isoline_vertex_data_array_buf_view =
+                js_sys::Uint8Array::view(isoline_vertex_data.as_u8_slice());
+            self.context.buffer_data_with_array_buffer_view(
+                WebGl2RenderingContext::ARRAY_BUFFER,
+                &isoline_vertex_data_array_buf_view,
+                WebGl2RenderingContext::DYNAMIC_DRAW,
+            );
+        }
+    }
+
+    pub fn draw(&self) {
+        let context = &self.context;
+
+        let resolution = 128;
+        let x_len = resolution;
+        let y_len = resolution;
+
+        self.update_buffers(x_len, y_len);
+
+        // Update color map
+        context.uniform3fv_with_f32_array(
+            Some(&self.color_map_uniform),
+            &color_maps::COLOR_MAP_MAGMA,
+        );
+
+        let index_data_len = 2 * (x_len * (y_len - 1) + (y_len - 2)) as usize;
+
+        // Draw
+        context.clear_color(0.0, 0.0, 0.0, 1.0);
+        context.clear(WebGl2RenderingContext::COLOR_BUFFER_BIT);
+
+        context.bind_vertex_array(Some(&self.vao_triangles));
+        context.draw_elements_with_i32(
+            WebGl2RenderingContext::TRIANGLE_STRIP,
+            index_data_len as i32,
+            WebGl2RenderingContext::UNSIGNED_INT,
+            0,
+        );
+
+        // context.bind_vertex_array(Some(&self.vao_lines));
+        // context.draw_elements_with_i32(
+        //     WebGl2RenderingContext::LINE_STRIP,
+        //     index_data_len as i32,
+        //     WebGl2RenderingContext::UNSIGNED_INT,
+        //     0,
+        // );
+
+        // context.bind_vertex_array(Some(&self.vao_isolines));
+        // context.draw_arrays(
+        //     WebGl2RenderingContext::LINES,
+        //     0,
+        //     isoline_vertex_data.len() as i32,
+        // );
+
+        context.bind_vertex_array(None);
+    }
+
+    pub fn update_curves(&mut self, curves: JsValue) {
+        let curves: [Curve; 2] =
+            serde_wasm_bindgen::from_value(curves).unwrap();
+        self.curves = curves;
+    }
+
+    pub fn resize(&self, width: i32, height: i32) {
+        self.context.viewport(0, 0, width, height);
+    }
+}
+
+/*
 #[wasm_bindgen]
 pub fn start(
     context: &WebGl2RenderingContext,
@@ -260,132 +563,6 @@ pub fn start_for_real(
         (BYTES_PER_FLOAT * FLOATS_PER_VERTEX) as usize,
         mem::size_of::<Vertex>()
     );
-
-    let vert_shader = compile_shader(
-        &context,
-        WebGl2RenderingContext::VERTEX_SHADER,
-        include_str!("shader.vert"),
-    )?;
-
-    let frag_shader = compile_shader(
-        &context,
-        WebGl2RenderingContext::FRAGMENT_SHADER,
-        include_str!("shader.frag"),
-    )?;
-
-    let program = link_program(&context, &vert_shader, &frag_shader)?;
-    context.use_program(Some(&program));
-
-    // Init: get attributes and uniforms
-    let position_attribute =
-        context.get_attrib_location(&program, "a_position") as u32;
-    let value_attribute =
-        context.get_attrib_location(&program, "a_value") as u32;
-
-    let color_map_uniform = context
-        .get_uniform_location(&program, "u_color_map")
-        .unwrap();
-
-    // Init: create buffers
-    let vertex_buffer =
-        context.create_buffer().ok_or("Failed to create buffer")?;
-    let index_buffer =
-        context.create_buffer().ok_or("Failed to create buffer")?;
-    let isoline_vertex_buffer =
-        context.create_buffer().ok_or("Failed to create buffer")?;
-
-    // Init: setup VertexArrayObject for main triangle mesh
-    let vao_triangles = context
-        .create_vertex_array()
-        .ok_or("Could not create vertex array object")?;
-    context.bind_vertex_array(Some(&vao_triangles));
-
-    context.bind_buffer(
-        WebGl2RenderingContext::ARRAY_BUFFER,
-        Some(&vertex_buffer),
-    );
-    context.bind_buffer(
-        WebGl2RenderingContext::ELEMENT_ARRAY_BUFFER,
-        Some(&index_buffer),
-    );
-
-    context.enable_vertex_attrib_array(position_attribute);
-    context.vertex_attrib_pointer_with_i32(
-        position_attribute,
-        FLOATS_PER_POSITION,
-        WebGl2RenderingContext::FLOAT,
-        false,
-        FLOATS_PER_VERTEX * BYTES_PER_FLOAT,
-        0,
-    );
-
-    context.enable_vertex_attrib_array(value_attribute);
-    context.vertex_attrib_pointer_with_i32(
-        value_attribute,
-        FLOATS_PER_VALUE,
-        WebGl2RenderingContext::FLOAT,
-        false,
-        FLOATS_PER_VERTEX * BYTES_PER_FLOAT,
-        FLOATS_PER_POSITION * BYTES_PER_FLOAT,
-    );
-
-    context.bind_vertex_array(None);
-
-    // Init: setup VertexArrayObject for mesh lines of main triangle mesh
-    let vao_lines = context
-        .create_vertex_array()
-        .ok_or("Could not create vertex array object")?;
-    context.bind_vertex_array(Some(&vao_lines));
-
-    context.bind_buffer(
-        WebGl2RenderingContext::ARRAY_BUFFER,
-        Some(&vertex_buffer),
-    );
-    context.bind_buffer(
-        WebGl2RenderingContext::ELEMENT_ARRAY_BUFFER,
-        Some(&index_buffer),
-    );
-
-    context.enable_vertex_attrib_array(position_attribute);
-    context.vertex_attrib_pointer_with_i32(
-        position_attribute,
-        FLOATS_PER_POSITION,
-        WebGl2RenderingContext::FLOAT,
-        false,
-        FLOATS_PER_VERTEX * BYTES_PER_FLOAT,
-        0,
-    );
-
-    // TODO: Use alternative vertex shader with a color uniform instead of a value attribute
-    context.vertex_attrib1f(value_attribute, 0.0);
-
-    context.bind_vertex_array(None);
-
-    // Init: setup VertexArrayObject for isolines
-    let vao_isolines = context
-        .create_vertex_array()
-        .ok_or("Could not create vertex array object")?;
-    context.bind_vertex_array(Some(&vao_isolines));
-
-    context.bind_buffer(
-        WebGl2RenderingContext::ARRAY_BUFFER,
-        Some(&isoline_vertex_buffer),
-    );
-
-    context.enable_vertex_attrib_array(position_attribute);
-    context.vertex_attrib_pointer_with_i32(
-        position_attribute,
-        FLOATS_PER_POSITION,
-        WebGl2RenderingContext::FLOAT,
-        false,
-        FLOATS_PER_VERTEX * BYTES_PER_FLOAT,
-        0,
-    );
-
-    // TODO: Use alternative vertex shader with a color uniform instead of a value attribute
-    context.vertex_attrib1f(value_attribute, 0.0);
-
-    context.bind_vertex_array(None);
 
     // UI
     let show_mesh = Rc::new(Cell::new(false));
@@ -648,37 +825,6 @@ pub fn start_for_real(
             );
         }
 
-        // Draw
-        context.clear_color(0.0, 0.0, 0.0, 1.0);
-        context.clear(WebGl2RenderingContext::COLOR_BUFFER_BIT);
-
-        context.bind_vertex_array(Some(&vao_triangles));
-        context.draw_elements_with_i32(
-            WebGl2RenderingContext::TRIANGLE_STRIP,
-            index_data_len as i32,
-            WebGl2RenderingContext::UNSIGNED_INT,
-            0,
-        );
-
-        if show_mesh.get() {
-            context.bind_vertex_array(Some(&vao_lines));
-            context.draw_elements_with_i32(
-                WebGl2RenderingContext::LINE_STRIP,
-                index_data_len as i32,
-                WebGl2RenderingContext::UNSIGNED_INT,
-                0,
-            );
-        }
-
-        context.bind_vertex_array(Some(&vao_isolines));
-        context.draw_arrays(
-            WebGl2RenderingContext::LINES,
-            0,
-            isoline_vertex_data.len() as i32,
-        );
-
-        context.bind_vertex_array(None);
-
         let finished = false;
         if finished {
             // Drop our handle to this closure so that it will get cleaned up once we return.
@@ -692,7 +838,7 @@ pub fn start_for_real(
     request_animation_frame(g.borrow().as_ref().unwrap());
 
     Ok(())
-}
+}*/
 
 fn compile_shader(
     context: &WebGl2RenderingContext,
@@ -742,14 +888,4 @@ fn link_program(
             .get_program_info_log(&program)
             .unwrap_or_else(|| "Unknown error linking program".to_string()))
     }
-}
-
-fn window() -> web_sys::Window {
-    web_sys::window().expect("no global `window` exists")
-}
-
-fn request_animation_frame(f: &Closure<dyn FnMut()>) {
-    window()
-        .request_animation_frame(f.as_ref().unchecked_ref())
-        .expect("should register `requestAnimationFrame` OK");
 }

@@ -1,4 +1,9 @@
 import { type Curve, CURVE_COLORS, type Point } from '../curves';
+import { useEffect, useState } from 'react';
+
+import init, { Plotter } from '../../rs_lib/pkg';
+// @ts-ignore: esbuild is configured to export the filename of the .wasm file
+import wasmFilePath from '../../rs_lib/pkg/rs_lib_bg.wasm';
 
 interface ParamSpaceViewProps {
     curves: [Curve, Curve];
@@ -62,6 +67,42 @@ export function ParamSpaceView(props: ParamSpaceViewProps): JSX.Element {
                     fill={CURVE_COLORS[0]}
                 />
             ))}
+            <foreignObject x={20} y={20} width={width} height={height}>
+                <Plot curves={curves} width={width} height={height} />
+            </foreignObject>
         </svg>
     );
+}
+
+interface PlotProps {
+    curves: [Curve, Curve];
+    width: number;
+    height: number;
+}
+
+function Plot(props: PlotProps): JSX.Element {
+    const { curves, height, width } = props;
+
+    const [canvas, setCanvas] = useState<HTMLCanvasElement | null>(null);
+    const [plotter, setPlotter] = useState<Plotter | null>(null);
+
+    useEffect(() => {
+        if (canvas === null) {
+            return;
+        }
+
+        const ctx = canvas.getContext('webgl2');
+
+        init(new URL(wasmFilePath, import.meta.url)).then(() => {
+            setPlotter(new Plotter(ctx));
+        });
+    }, [canvas]);
+
+    useEffect(() => {
+        plotter?.update_curves(curves);
+        plotter?.resize(width, height);
+        plotter?.draw();
+    }, [plotter, curves, width, height]);
+
+    return <canvas ref={setCanvas} width={width} height={height} />;
 }
