@@ -10,12 +10,15 @@ interface ParamSpaceViewProps {
 
 function makeGridLines(xCoords: number[], yCoords: number[]): string {
     const verticalLines = xCoords
-        .map((x) => `M${x} ${yCoords[0]}V${yCoords[yCoords.length - 1]}`)
+        .filter((_, index, array) => index !== 0 && index !== array.length - 1)
+        .map((x) => Math.round(x - 0.5) + 0.5)
+        .map((x) => `M${x} 0V${Math.floor(yCoords[yCoords.length - 1])}`)
         .join('');
     const horizontalLines = yCoords
-        .map((y) => `M${xCoords[0]} ${y}H${xCoords[xCoords.length - 1]}`)
+        .filter((_, index, array) => index !== 0 && index !== array.length - 1)
+        .map((y) => Math.round(y - 0.5) + 0.5)
+        .map((y) => `M0 ${y}H${Math.floor(xCoords[xCoords.length - 1])}`)
         .join('');
-
     return verticalLines + horizontalLines;
 }
 
@@ -34,115 +37,110 @@ export function ParamSpaceView(props: ParamSpaceViewProps): JSX.Element {
     const height = cumulativeLengths2[cumulativeLengths2.length - 1];
 
     return (
-        <svg
-            width={width + 30}
-            height={height + 30}
-            style={{ border: '1px solid gray' }}
-        >
-            <g
-                className="curve"
-                data-curve-idx={0}
-                transform={`translate(20, ${height + 20})`}
-            >
-                <line
-                    className="curve__line"
-                    x1={0}
-                    y1={0}
-                    x2={cumulativeLengths1[cumulativeLengths1.length - 1]}
-                    y2={0}
-                />
-                {cumulativeLengths1.map((x, pointIdx) => (
-                    <circle
-                        key={pointIdx}
-                        className="curve__point"
-                        cx={x}
-                        cy={0}
-                    />
-                ))}
-            </g>
-            <g
-                className="curve"
-                data-curve-idx={1}
-                transform={`translate(10, ${height + 30 - 20}) scale(1, -1)`}
-            >
-                <line
-                    className="curve__line"
-                    x1={0}
-                    y1={0}
-                    x2={0}
-                    y2={cumulativeLengths2[cumulativeLengths2.length - 1]}
-                />
-                {cumulativeLengths2.map((y, pointIdx) => (
-                    <circle
-                        key={pointIdx}
-                        className="curve__point"
-                        cx={0}
-                        cy={y}
-                    />
-                ))}
-            </g>
-            <foreignObject
-                x={20}
-                y={10}
-                width={width}
-                height={height}
-                onMouseMove={(e) => {
-                    const { x, y, height } =
-                        e.currentTarget.getBoundingClientRect();
-
-                    setHighlightLeash([
-                        e.clientX - x,
-                        height - (e.clientY - y),
-                    ]);
-                }}
-                onMouseLeave={() => {
-                    setHighlightLeash(null);
-                }}
-            >
-                <Plot curves={curves} width={width} height={height} />
-            </foreignObject>
-            <g
-                transform={`translate(20, ${height + 30 - 20}) scale(1, -1)`}
-                style={{ pointerEvents: 'none' }}
-            >
-                <path
-                    d={makeGridLines(cumulativeLengths1, cumulativeLengths2)}
-                    fill="none"
-                    stroke="white"
-                />
-                {highlightLeash && (
-                    <g className="leash">
+        <svg width={500} height={500} style={{ border: '1px solid gray' }}>
+            <g transform="translate(0, 500) scale(1, -1)">
+                {/* Flattened curves along axes */}
+                {[
+                    cumulativeLengths1.map((x) => ({ x, y: 0 })),
+                    cumulativeLengths2.map((y) => ({ x: 0, y })),
+                ].map((coords, curveIdx) => (
+                    <g
+                        key={curveIdx}
+                        className="curve"
+                        data-curve-idx={curveIdx}
+                        transform={
+                            curveIdx === 0
+                                ? 'translate(20, 10)'
+                                : 'translate(10, 20)'
+                        }
+                    >
                         <line
-                            className="leash__line leash__line--dashed"
-                            x1={-10}
-                            y1={highlightLeash[1]}
-                            x2={highlightLeash[0]}
-                            y2={highlightLeash[1]}
+                            className="curve__line"
+                            x1={0}
+                            y1={0}
+                            x2={coords[coords.length - 1].x}
+                            y2={coords[coords.length - 1].y}
                         />
-                        <line
-                            className="leash__line leash__line--dashed"
-                            x1={highlightLeash[0]}
-                            y1={-10}
-                            x2={highlightLeash[0]}
-                            y2={highlightLeash[1]}
-                        />
-                        <circle
-                            className="leash__point"
-                            cx={highlightLeash[0]}
-                            cy={highlightLeash[1]}
-                        />
-                        <circle
-                            className="leash__point"
-                            cx={-10}
-                            cy={highlightLeash[1]}
-                        />
-                        <circle
-                            className="leash__point"
-                            cx={highlightLeash[0]}
-                            cy={-10}
-                        />
+                        {coords.map(({ x, y }, pointIdx) => (
+                            <circle
+                                key={pointIdx}
+                                className="curve__point"
+                                cx={x}
+                                cy={y}
+                            />
+                        ))}
                     </g>
-                )}
+                ))}
+
+                {/* Plot canvas */}
+                <foreignObject
+                    className="plot-canvas"
+                    x={20}
+                    y={20}
+                    width={width}
+                    height={height}
+                    onMouseMove={(e) => {
+                        const { x, y, height } =
+                            e.currentTarget.getBoundingClientRect();
+
+                        setHighlightLeash([
+                            e.clientX - x,
+                            height - (e.clientY - y),
+                        ]);
+                    }}
+                    onMouseLeave={() => {
+                        setHighlightLeash(null);
+                    }}
+                >
+                    <Plot curves={curves} width={width} height={height} />
+                </foreignObject>
+
+                {/* Plot overlay */}
+                <g
+                    className="plot-overlay"
+                    transform="translate(20, 20)"
+                >
+                    <path
+                        className="grid-lines"
+                        d={makeGridLines(
+                            cumulativeLengths1,
+                            cumulativeLengths2,
+                        )}
+                    />
+                    {highlightLeash && (
+                        <g className="leash">
+                            <line
+                                className="leash__line leash__line--dashed"
+                                x1={-10}
+                                y1={highlightLeash[1]}
+                                x2={highlightLeash[0]}
+                                y2={highlightLeash[1]}
+                            />
+                            <line
+                                className="leash__line leash__line--dashed"
+                                x1={highlightLeash[0]}
+                                y1={-10}
+                                x2={highlightLeash[0]}
+                                y2={highlightLeash[1]}
+                            />
+                            <circle
+                                className="leash__point"
+                                cx={highlightLeash[0]}
+                                cy={highlightLeash[1]}
+                            />
+                            <circle
+                                className="leash__point"
+                                cx={-10}
+                                cy={highlightLeash[1]}
+                            />
+                            <circle
+                                className="leash__point"
+                                cx={highlightLeash[0]}
+                                cy={-10}
+                            />
+                        </g>
+                    )}
+                </g>
             </g>
         </svg>
     );
@@ -179,5 +177,12 @@ function Plot(props: PlotProps): JSX.Element {
         plotter.draw();
     }, [plotter, curves, width, height]);
 
-    return <canvas ref={setCanvas} width={width} height={height} />;
+    return (
+        <canvas
+            ref={setCanvas}
+            width={width}
+            height={height}
+            style={{ transform: 'scale(1, -1)', transformOrigin: '50% 50%' }}
+        />
+    );
 }

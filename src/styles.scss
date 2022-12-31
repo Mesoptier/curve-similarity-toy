@@ -1,6 +1,10 @@
 // Variables
 :root {
+    --background-color: #222;
+    --text-color: #eee;
+
     --leash-color: green;
+    --grid-color: white;
 }
 [data-curve-idx="0"] {
     --curve-color: red;
@@ -10,14 +14,20 @@
 }
 
 // Base
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+}
+
 html {
     font-family: sans-serif;
     color-scheme: dark;
 }
 
 body {
-    background-color: #222;
-    color: #eee;
+    background-color: var(--background-color);
+    color: var(--text-color);
 }
 
 // Curves
@@ -56,4 +66,19 @@ body {
         fill: var(--leash-color);
         r: 3;
     }
+}
+
+// Plot
+.plot-canvas {
+    border: 1px solid var(--grid-color);
+}
+
+.plot-overlay {
+    pointer-events: none;
+}
+
+.grid-lines {
+    fill: none;
+    stroke: var(--grid-color);
+    stroke-width: 1;
 }
