@@ -12,9 +12,9 @@ export function App(): JSX.Element {
             { x: 91, y: 298 },
         ]),
         new JsCurve([
-            { x: 227, y: 387 },
-            { x: 264, y: 344 },
             { x: 300, y: 214 },
+            { x: 264, y: 344 },
+            { x: 227, y: 387 },
         ]),
     ]);
 
