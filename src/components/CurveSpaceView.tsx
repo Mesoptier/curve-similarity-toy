@@ -1,6 +1,6 @@
-import { type Dispatch, Fragment, type SetStateAction } from 'react';
+import { type Dispatch, type SetStateAction, useEffect, useState } from 'react';
 
-import { JsCurve } from '@rs_lib';
+import { IPoint, JsCurve } from '@rs_lib';
 import { CURVE_COLORS } from '../curves';
 
 function makePathDefinition(curve: JsCurve): string {
@@ -16,8 +16,34 @@ interface CurveSpaceViewProps {
     updateCurves: Dispatch<SetStateAction<JsCurve[]>>;
 }
 
+type PreviewPoints = [IPoint | null, IPoint | null];
+
 export function CurveSpaceView(props: CurveSpaceViewProps): JSX.Element {
     const { curves, updateCurves } = props;
+
+    const [previewPoints, setPreviewPoints] = useState<PreviewPoints>([
+        null,
+        null,
+    ]);
+
+    useEffect(() => {
+        function handleKeyboardEvent(e: KeyboardEvent) {
+            setPreviewPoints((previewPoints) => {
+                const curveIdx = e.ctrlKey ? 1 : 0;
+                if (previewPoints[curveIdx] === null) {
+                    return [previewPoints[1], previewPoints[0]];
+                }
+                return previewPoints;
+            });
+        }
+
+        window.addEventListener('keydown', handleKeyboardEvent);
+        window.addEventListener('keyup', handleKeyboardEvent);
+        return () => {
+            window.removeEventListener('keydown', handleKeyboardEvent);
+            window.removeEventListener('keyup', handleKeyboardEvent);
+        };
+    }, []);
 
     return (
         <svg
@@ -36,27 +62,79 @@ export function CurveSpaceView(props: CurveSpaceViewProps): JSX.Element {
                     return curves;
                 });
             }}
+            onMouseMove={(e) => {
+                const curveIdx = e.ctrlKey ? 1 : 0;
+                const newPoint = {
+                    x: e.clientX - e.currentTarget.getBoundingClientRect().x,
+                    y: e.clientY - e.currentTarget.getBoundingClientRect().y,
+                };
+
+                const previewPoints: PreviewPoints = [null, null];
+                previewPoints[curveIdx] = newPoint;
+                setPreviewPoints(previewPoints);
+            }}
+            onMouseLeave={() => {
+                setPreviewPoints([null, null]);
+            }}
             style={{ border: '1px solid gray' }}
         >
             {curves.map((curve, curveIdx) => (
-                <Fragment key={curveIdx}>
-                    {curve.points.map(({ x, y }, pointIdx) => (
-                        <circle
-                            key={pointIdx}
-                            cx={x}
-                            cy={y}
-                            r={5}
-                            fill={CURVE_COLORS[curveIdx]}
-                        />
-                    ))}
-                    <path
-                        d={makePathDefinition(curve)}
-                        stroke={CURVE_COLORS[curveIdx]}
+                <CurvePreview
+                    key={curveIdx}
+                    curve={curve}
+                    previewPoint={previewPoints[curveIdx]}
+                    color={CURVE_COLORS[curveIdx]}
+                />
+            ))}
+        </svg>
+    );
+}
+
+interface CurvePreviewProps {
+    curve: JsCurve;
+    previewPoint: IPoint | null;
+    color: string;
+}
+
+function CurvePreview(props: CurvePreviewProps): JSX.Element | null {
+    const { curve, previewPoint, color } = props;
+
+    if (curve.points.length === 0) {
+        return null;
+    }
+
+    const lastPoint = curve.points[curve.points.length - 1];
+
+    return (
+        <>
+            {curve.points.map(({ x, y }, pointIdx) => (
+                <circle key={pointIdx} cx={x} cy={y} r={5} fill={color} />
+            ))}
+            <path
+                d={makePathDefinition(curve)}
+                stroke={color}
+                strokeWidth={2}
+                fill="none"
+            />
+            {previewPoint && (
+                <g style={{ opacity: 0.5 }}>
+                    <circle
+                        cx={previewPoint.x}
+                        cy={previewPoint.y}
+                        r={5}
+                        fill={color}
+                    />
+                    <line
+                        x1={lastPoint.x}
+                        y1={lastPoint.y}
+                        x2={previewPoint.x}
+                        y2={previewPoint.y}
+                        stroke={color}
                         strokeWidth={2}
                         fill="none"
                     />
-                </Fragment>
-            ))}
-        </svg>
+                </g>
+            )}
+        </>
     );
 }
