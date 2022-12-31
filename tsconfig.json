@@ -4,7 +4,12 @@
     "moduleResolution": "NodeNext",
     "jsx": "react-jsx",
     "lib": ["ESNext", "DOM"],
-    "noEmit": true
+    "noEmit": true,
+    "baseUrl": "./src",
+    "paths": {
+      "@rs_lib": ["../rs_lib/pkg"],
+      "@rs_lib/*": ["../rs_lib/pkg/*"]
+    }
   },
   "include": [
     "src/**/*"

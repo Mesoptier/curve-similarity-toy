@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 
-import { Plotter, JsCurve } from '../../rs_lib/pkg';
+import { Plotter, JsCurve } from '@rs_lib';
 import { CURVE_COLORS } from '../curves';
 
 interface ParamSpaceViewProps {

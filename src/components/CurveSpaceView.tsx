@@ -1,6 +1,6 @@
 import { type Dispatch, Fragment, type SetStateAction } from 'react';
 
-import { JsCurve } from '../../rs_lib/pkg';
+import { JsCurve } from '@rs_lib';
 import { CURVE_COLORS } from '../curves';
 
 function makePathDefinition(curve: JsCurve): string {

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-import { JsCurve } from '../../rs_lib/pkg';
+import { JsCurve } from '@rs_lib';
 import { CurveSpaceView } from './CurveSpaceView';
 import { ParamSpaceView } from './ParamSpaceView';
 
