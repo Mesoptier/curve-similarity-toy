@@ -1,17 +1,10 @@
 import { useEffect, useState } from 'react';
 
-import { Plotter, JsCurve,  IPoint } from '../../rs_lib/pkg';
+import { Plotter, JsCurve } from '../../rs_lib/pkg';
 import { CURVE_COLORS } from '../curves';
 
 interface ParamSpaceViewProps {
     curves: [JsCurve, JsCurve];
-}
-
-/**
- * Computes Euclidean distance two points.
- */
-function dist(p1: IPoint, p2: IPoint): number {
-    return Math.sqrt((p1.x - p2.x) ** 2 + (p1.y - p2.y) ** 2);
 }
 
 function makeGridLines(xCoords: number[], yCoords: number[]): string {
