@@ -18,10 +18,22 @@ export function App(): JSX.Element {
         ]),
     ]);
 
+    const [highlightLeash, setHighlightLeash] = useState<
+        [number, number] | null
+    >(null);
+
     return (
         <div style={{ display: 'flex' }}>
-            <CurveSpaceView curves={curves} updateCurves={setCurves} />
-            <ParamSpaceView curves={curves} />
+            <CurveSpaceView
+                curves={curves}
+                updateCurves={setCurves}
+                highlightLeash={highlightLeash}
+            />
+            <ParamSpaceView
+                curves={curves}
+                highlightLeash={highlightLeash}
+                setHighlightLeash={setHighlightLeash}
+            />
         </div>
     );
 }

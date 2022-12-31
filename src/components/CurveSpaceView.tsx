@@ -14,12 +14,13 @@ function makePathDefinition(curve: JsCurve): string {
 interface CurveSpaceViewProps {
     curves: [JsCurve, JsCurve];
     updateCurves: Dispatch<SetStateAction<JsCurve[]>>;
+    highlightLeash: [number, number] | null;
 }
 
 type PreviewPoints = [IPoint | null, IPoint | null];
 
 export function CurveSpaceView(props: CurveSpaceViewProps): JSX.Element {
-    const { curves, updateCurves } = props;
+    const { curves, updateCurves, highlightLeash } = props;
 
     const [previewPoints, setPreviewPoints] = useState<PreviewPoints>([
         null,
@@ -86,6 +87,9 @@ export function CurveSpaceView(props: CurveSpaceViewProps): JSX.Element {
                     color={CURVE_COLORS[curveIdx]}
                 />
             ))}
+            {highlightLeash && (
+                <LeashPreview curves={curves} leash={highlightLeash} />
+            )}
         </svg>
     );
 }
@@ -131,10 +135,41 @@ function CurvePreview(props: CurvePreviewProps): JSX.Element | null {
                         y2={previewPoint.y}
                         stroke={color}
                         strokeWidth={2}
-                        fill="none"
                     />
                 </g>
             )}
+        </>
+    );
+}
+
+interface LeashPreviewProps {
+    curves: [JsCurve, JsCurve];
+    leash: [number, number];
+}
+
+function LeashPreview(props: LeashPreviewProps): JSX.Element {
+    const { curves, leash } = props;
+    const points = [curves[0].at(leash[0]), curves[1].at(leash[1])];
+
+    return (
+        <>
+            {points.map((point, pointIdx) => (
+                <circle
+                    key={pointIdx}
+                    cx={point.x}
+                    cy={point.y}
+                    r={3}
+                    fill="green"
+                />
+            ))}
+            <line
+                x1={points[0].x}
+                y1={points[0].y}
+                x2={points[1].x}
+                y2={points[1].y}
+                stroke="green"
+                strokeWidth={2}
+            />
         </>
     );
 }

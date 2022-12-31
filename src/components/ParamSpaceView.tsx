@@ -1,10 +1,12 @@
-import { useEffect, useState } from 'react';
+import { type Dispatch, type SetStateAction, useEffect, useState } from 'react';
 
 import { Plotter, JsCurve } from '@rs_lib';
 import { CURVE_COLORS } from '../curves';
 
 interface ParamSpaceViewProps {
     curves: [JsCurve, JsCurve];
+    highlightLeash: [number, number] | null;
+    setHighlightLeash: Dispatch<SetStateAction<[number, number] | null>>;
 }
 
 function makeGridLines(xCoords: number[], yCoords: number[]): string {
@@ -19,7 +21,7 @@ function makeGridLines(xCoords: number[], yCoords: number[]): string {
 }
 
 export function ParamSpaceView(props: ParamSpaceViewProps): JSX.Element {
-    const { curves } = props;
+    const { curves, highlightLeash, setHighlightLeash } = props;
 
     if (curves.some((curve) => curve.points.length <= 1)) {
         return null;
@@ -38,33 +40,116 @@ export function ParamSpaceView(props: ParamSpaceViewProps): JSX.Element {
             height={height + 30}
             style={{ border: '1px solid gray' }}
         >
-            {cumulativeLengths1.map((x, pointIdx) => (
-                <circle
-                    key={pointIdx}
-                    cx={x + 20}
-                    cy={height + 30 - 10}
-                    r={5}
-                    fill={CURVE_COLORS[0]}
+            <g transform={`translate(20, ${height + 20})`}>
+                <line
+                    x1={0}
+                    y1={0}
+                    x2={cumulativeLengths1[cumulativeLengths1.length - 1]}
+                    y2={0}
+                    stroke={CURVE_COLORS[0]}
+                    strokeWidth={2}
                 />
-            ))}
-            {cumulativeLengths2.map((y, pointIdx) => (
-                <circle
-                    key={pointIdx}
-                    cx={10}
-                    cy={height + 30 - (y + 20)}
-                    r={5}
-                    fill={CURVE_COLORS[1]}
+                {cumulativeLengths1.map((x, pointIdx) => (
+                    <circle
+                        key={pointIdx}
+                        cx={x}
+                        cy={0}
+                        r={5}
+                        fill={CURVE_COLORS[0]}
+                    />
+                ))}
+            </g>
+            <g transform={`translate(10, ${height + 30 - 20}) scale(1, -1)`}>
+                <line
+                    x1={0}
+                    y1={0}
+                    x2={0}
+                    y2={cumulativeLengths2[cumulativeLengths2.length - 1]}
+                    stroke={CURVE_COLORS[1]}
+                    strokeWidth={2}
                 />
-            ))}
-            <foreignObject x={20} y={10} width={width} height={height}>
+                {cumulativeLengths2.map((y, pointIdx) => (
+                    <circle
+                        key={pointIdx}
+                        cx={0}
+                        cy={y}
+                        r={5}
+                        fill={CURVE_COLORS[1]}
+                    />
+                ))}
+            </g>
+            <foreignObject
+                x={20}
+                y={10}
+                width={width}
+                height={height}
+                onMouseMove={(e) => {
+                    const { x, y, height } =
+                        e.currentTarget.getBoundingClientRect();
+
+                    setHighlightLeash([
+                        e.clientX - x,
+                        height - (e.clientY - y),
+                    ]);
+                }}
+                onMouseLeave={() => {
+                    setHighlightLeash(null);
+                }}
+            >
                 <Plot curves={curves} width={width} height={height} />
             </foreignObject>
-            <path
+            <g
                 transform={`translate(20, ${height + 30 - 20}) scale(1, -1)`}
-                d={makeGridLines(cumulativeLengths1, cumulativeLengths2)}
-                fill="none"
-                stroke="white"
-            />
+                style={{ pointerEvents: 'none' }}
+            >
+                <path
+                    d={makeGridLines(cumulativeLengths1, cumulativeLengths2)}
+                    fill="none"
+                    stroke="white"
+                />
+                {highlightLeash && (
+                    <>
+                        <line
+                            x2={highlightLeash[0]}
+                            y2={highlightLeash[1]}
+                            x1={-10}
+                            y1={highlightLeash[1]}
+                            stroke="green"
+                            strokeWidth={2}
+                            strokeDasharray="2 4"
+                            strokeLinecap="round"
+                        />
+                        <line
+                            x2={highlightLeash[0]}
+                            y2={highlightLeash[1]}
+                            x1={highlightLeash[0]}
+                            y1={-10}
+                            stroke="green"
+                            strokeWidth={2}
+                            strokeDasharray="2 4"
+                            strokeLinecap="round"
+                        />
+                        <circle
+                            cx={highlightLeash[0]}
+                            cy={highlightLeash[1]}
+                            r={3}
+                            fill="green"
+                        />
+                        <circle
+                            cx={-10}
+                            cy={highlightLeash[1]}
+                            r={3}
+                            fill="green"
+                        />
+                        <circle
+                            cx={highlightLeash[0]}
+                            cy={-10}
+                            r={3}
+                            fill="green"
+                        />
+                    </>
+                )}
+            </g>
         </svg>
     );
 }
