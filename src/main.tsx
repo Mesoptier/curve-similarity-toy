@@ -6,6 +6,7 @@ import init from '@rs_lib';
 import wasmFilePath from '@rs_lib/rs_lib_bg.wasm';
 
 import { App } from './components/App';
+import './styles.scss';
 
 const container = document.getElementById('container');
 const root = createRoot(container);

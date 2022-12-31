@@ -1,7 +1,6 @@
 import { type Dispatch, type SetStateAction, useEffect, useState } from 'react';
 
 import { Plotter, JsCurve } from '@rs_lib';
-import { CURVE_COLORS } from '../curves';
 
 interface ParamSpaceViewProps {
     curves: [JsCurve, JsCurve];
@@ -40,41 +39,45 @@ export function ParamSpaceView(props: ParamSpaceViewProps): JSX.Element {
             height={height + 30}
             style={{ border: '1px solid gray' }}
         >
-            <g transform={`translate(20, ${height + 20})`}>
+            <g
+                className="curve"
+                data-curve-idx={0}
+                transform={`translate(20, ${height + 20})`}
+            >
                 <line
+                    className="curve__line"
                     x1={0}
                     y1={0}
                     x2={cumulativeLengths1[cumulativeLengths1.length - 1]}
                     y2={0}
-                    stroke={CURVE_COLORS[0]}
-                    strokeWidth={2}
                 />
                 {cumulativeLengths1.map((x, pointIdx) => (
                     <circle
                         key={pointIdx}
+                        className="curve__point"
                         cx={x}
                         cy={0}
-                        r={5}
-                        fill={CURVE_COLORS[0]}
                     />
                 ))}
             </g>
-            <g transform={`translate(10, ${height + 30 - 20}) scale(1, -1)`}>
+            <g
+                className="curve"
+                data-curve-idx={1}
+                transform={`translate(10, ${height + 30 - 20}) scale(1, -1)`}
+            >
                 <line
+                    className="curve__line"
                     x1={0}
                     y1={0}
                     x2={0}
                     y2={cumulativeLengths2[cumulativeLengths2.length - 1]}
-                    stroke={CURVE_COLORS[1]}
-                    strokeWidth={2}
                 />
                 {cumulativeLengths2.map((y, pointIdx) => (
                     <circle
                         key={pointIdx}
+                        className="curve__point"
                         cx={0}
                         cy={y}
-                        r={5}
-                        fill={CURVE_COLORS[1]}
                     />
                 ))}
             </g>
@@ -108,46 +111,37 @@ export function ParamSpaceView(props: ParamSpaceViewProps): JSX.Element {
                     stroke="white"
                 />
                 {highlightLeash && (
-                    <>
+                    <g className="leash">
                         <line
-                            x2={highlightLeash[0]}
-                            y2={highlightLeash[1]}
+                            className="leash__line leash__line--dashed"
                             x1={-10}
                             y1={highlightLeash[1]}
-                            stroke="green"
-                            strokeWidth={2}
-                            strokeDasharray="2 4"
-                            strokeLinecap="round"
-                        />
-                        <line
                             x2={highlightLeash[0]}
                             y2={highlightLeash[1]}
+                        />
+                        <line
+                            className="leash__line leash__line--dashed"
                             x1={highlightLeash[0]}
                             y1={-10}
-                            stroke="green"
-                            strokeWidth={2}
-                            strokeDasharray="2 4"
-                            strokeLinecap="round"
+                            x2={highlightLeash[0]}
+                            y2={highlightLeash[1]}
                         />
                         <circle
+                            className="leash__point"
                             cx={highlightLeash[0]}
                             cy={highlightLeash[1]}
-                            r={3}
-                            fill="green"
                         />
                         <circle
+                            className="leash__point"
                             cx={-10}
                             cy={highlightLeash[1]}
-                            r={3}
-                            fill="green"
                         />
                         <circle
+                            className="leash__point"
                             cx={highlightLeash[0]}
                             cy={-10}
-                            r={3}
-                            fill="green"
                         />
-                    </>
+                    </g>
                 )}
             </g>
         </svg>

@@ -1,7 +1,6 @@
 import { type Dispatch, type SetStateAction, useEffect, useState } from 'react';
 
 import { IPoint, JsCurve } from '@rs_lib';
-import { CURVE_COLORS } from '../curves';
 
 function makePathDefinition(curve: JsCurve): string {
     const { points } = curve;
@@ -83,8 +82,8 @@ export function CurveSpaceView(props: CurveSpaceViewProps): JSX.Element {
                 <CurvePreview
                     key={curveIdx}
                     curve={curve}
+                    curveIdx={curveIdx}
                     previewPoint={previewPoints[curveIdx]}
-                    color={CURVE_COLORS[curveIdx]}
                 />
             ))}
             {highlightLeash && (
@@ -96,12 +95,12 @@ export function CurveSpaceView(props: CurveSpaceViewProps): JSX.Element {
 
 interface CurvePreviewProps {
     curve: JsCurve;
+    curveIdx: number;
     previewPoint: IPoint | null;
-    color: string;
 }
 
 function CurvePreview(props: CurvePreviewProps): JSX.Element | null {
-    const { curve, previewPoint, color } = props;
+    const { curve, curveIdx, previewPoint } = props;
 
     if (curve.points.length === 0) {
         return null;
@@ -110,35 +109,28 @@ function CurvePreview(props: CurvePreviewProps): JSX.Element | null {
     const lastPoint = curve.points[curve.points.length - 1];
 
     return (
-        <>
+        <g className="curve" data-curve-idx={curveIdx}>
             {curve.points.map(({ x, y }, pointIdx) => (
-                <circle key={pointIdx} cx={x} cy={y} r={5} fill={color} />
+                <circle key={pointIdx} className="curve__point" cx={x} cy={y} />
             ))}
-            <path
-                d={makePathDefinition(curve)}
-                stroke={color}
-                strokeWidth={2}
-                fill="none"
-            />
+            <path className="curve__line" d={makePathDefinition(curve)} />
             {previewPoint && (
-                <g style={{ opacity: 0.5 }}>
-                    <circle
-                        cx={previewPoint.x}
-                        cy={previewPoint.y}
-                        r={5}
-                        fill={color}
-                    />
+                <g className="curve__preview">
                     <line
+                        className="curve__line"
                         x1={lastPoint.x}
                         y1={lastPoint.y}
                         x2={previewPoint.x}
                         y2={previewPoint.y}
-                        stroke={color}
-                        strokeWidth={2}
+                    />
+                    <circle
+                        className="curve__point"
+                        cx={previewPoint.x}
+                        cy={previewPoint.y}
                     />
                 </g>
             )}
-        </>
+        </g>
     );
 }
 
@@ -152,24 +144,22 @@ function LeashPreview(props: LeashPreviewProps): JSX.Element {
     const points = [curves[0].at(leash[0]), curves[1].at(leash[1])];
 
     return (
-        <>
+        <g className="leash">
             {points.map((point, pointIdx) => (
                 <circle
+                    className="leash__point"
                     key={pointIdx}
                     cx={point.x}
                     cy={point.y}
-                    r={3}
-                    fill="green"
                 />
             ))}
             <line
+                className="leash__line"
                 x1={points[0].x}
                 y1={points[0].y}
                 x2={points[1].x}
                 y2={points[1].y}
-                stroke="green"
-                strokeWidth={2}
             />
-        </>
+        </g>
     );
 }

@@ -1,0 +1,59 @@
+// Variables
+:root {
+    --leash-color: green;
+}
+[data-curve-idx="0"] {
+    --curve-color: red;
+}
+[data-curve-idx="1"] {
+    --curve-color: yellow;
+}
+
+// Base
+html {
+    font-family: sans-serif;
+    color-scheme: dark;
+}
+
+body {
+    background-color: #222;
+    color: #eee;
+}
+
+// Curves
+.curve {
+    &__line {
+        fill: none;
+        stroke: var(--curve-color);
+        stroke-width: 2;
+    }
+
+    &__point {
+        fill: var(--curve-color);
+        r: 5;
+    }
+
+    &__preview {
+        opacity: 0.5;
+    }
+}
+
+
+// Leashes
+.leash {
+    &__line {
+        fill: none;
+        stroke: var(--leash-color);
+        stroke-width: 2;
+
+        &--dashed {
+            stroke-dasharray: 2 4;
+            stroke-linecap: round;
+        }
+    }
+
+    &__point {
+        fill: var(--leash-color);
+        r: 3;
+    }
+}

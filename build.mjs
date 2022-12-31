@@ -1,5 +1,6 @@
 import esbuild from 'esbuild';
 import { cleanPlugin } from 'esbuild-clean-plugin';
+import { sassPlugin } from 'esbuild-sass-plugin';
 
 const watch = process.argv.includes('--watch');
 
@@ -20,5 +21,6 @@ esbuild.build({
     minify: profile === 'release',
     plugins: [
         cleanPlugin(),
+        sassPlugin(),
     ],
 });
