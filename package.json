@@ -8,7 +8,7 @@
     "build": "node build.mjs",
     "build:dev": "yarn build --dev",
     "build:release": "yarn build --release",
-    "watch": "yarn build --watch",
+    "watch": "yarn build:dev --watch",
     "serve": "esbuild --servedir=www",
     "prettier": "prettier --write src/",
     "test:prettier": "prettier --check src/",
