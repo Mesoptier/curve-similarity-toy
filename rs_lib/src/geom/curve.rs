@@ -1,18 +1,17 @@
-use crate::geom::point::Point;
-use num::traits::NumAssignOps;
-use num::{clamp, Float};
-use std::fmt::Display;
+use super::point::Point;
+use super::Dist;
+use crate::Mix;
 
-#[derive(Debug, Default)]
-pub struct Curve<T> {
-    points: Vec<Point<T>>,
-    cumulative_lengths: Vec<T>,
+#[derive(Debug, Default, Clone)]
+pub struct Curve {
+    points: Vec<Point>,
+    cumulative_lengths: Vec<Dist>,
 }
 
-impl<T: Float + NumAssignOps + Display> Curve<T> {
-    fn compute_cumulative_lengths(points: &Vec<Point<T>>) -> Vec<T> {
+impl Curve {
+    fn compute_cumulative_lengths(points: &Vec<Point>) -> Vec<Dist> {
         (0..points.len())
-            .scan(T::zero(), |cumulative_length, idx| {
+            .scan(0., |cumulative_length, idx| {
                 if idx != 0 {
                     *cumulative_length += points[idx].dist(&points[idx - 1]);
                 }
@@ -21,19 +20,33 @@ impl<T: Float + NumAssignOps + Display> Curve<T> {
             .collect()
     }
 
-    pub fn from_points(points: Vec<Point<T>>) -> Self {
+    pub fn from_points(points: Vec<Point>) -> Self {
         Self {
             cumulative_lengths: Self::compute_cumulative_lengths(&points),
             points,
         }
     }
 
-    pub fn total_length(&self) -> T {
+    pub fn push(&mut self, point: Point) {
+        let new_length =
+            match (self.points.last(), self.cumulative_lengths.last()) {
+                (Some(last_point), Some(last_length)) => {
+                    *last_length + point.dist(last_point)
+                }
+                (None, None) => 0.,
+                _ => unreachable!(),
+            };
+
+        self.points.push(point);
+        self.cumulative_lengths.push(new_length);
+    }
+
+    pub fn total_length(&self) -> Dist {
         *self.cumulative_lengths.last().unwrap()
     }
 
-    pub fn at(&self, length: T) -> Point<T> {
-        let length = clamp(length, T::zero(), self.total_length());
+    pub fn at(&self, length: Dist) -> Point {
+        let length = length.clamp(0., self.total_length());
 
         let idx = self
             .cumulative_lengths
@@ -51,8 +64,16 @@ impl<T: Float + NumAssignOps + Display> Curve<T> {
             let point_1 = self.points[idx - 1];
             let point_2 = self.points[idx];
 
-            point_1 * (T::one() - t) + point_2 * t
+            point_1.mix(point_2, t)
         }
+    }
+
+    pub fn points(&self) -> &Vec<Point> {
+        &self.points
+    }
+
+    pub fn cumulative_lengths(&self) -> &Vec<Dist> {
+        &self.cumulative_lengths
     }
 }
 

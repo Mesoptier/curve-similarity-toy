@@ -1,17 +1,19 @@
 import { type Dispatch, Fragment, type SetStateAction } from 'react';
-import { type Curve, CURVE_COLORS } from '../curves';
 
-function makePathDefinition(curve: Curve): string {
-    if (curve.length === 0) {
+import { JsCurve } from '../../rs_lib/pkg';
+import { CURVE_COLORS } from '../curves';
+
+function makePathDefinition(curve: JsCurve): string {
+    const { points } = curve;
+    if (points.length === 0) {
         return '';
     }
-
-    return 'M' + curve.map(({ x, y }) => `${x},${y}`).join(' ');
+    return 'M' + points.map(({ x, y }) => `${x},${y}`).join(' ');
 }
 
 interface CurveSpaceViewProps {
-    curves: [Curve, Curve];
-    updateCurves: Dispatch<SetStateAction<Curve[]>>;
+    curves: [JsCurve, JsCurve];
+    updateCurves: Dispatch<SetStateAction<JsCurve[]>>;
 }
 
 export function CurveSpaceView(props: CurveSpaceViewProps): JSX.Element {
@@ -30,7 +32,7 @@ export function CurveSpaceView(props: CurveSpaceViewProps): JSX.Element {
 
                 updateCurves((curves) => {
                     curves = [...curves];
-                    curves[curveIdx] = [...curves[curveIdx], newPoint];
+                    curves[curveIdx] = curves[curveIdx].with_point(newPoint);
                     return curves;
                 });
             }}
@@ -38,7 +40,7 @@ export function CurveSpaceView(props: CurveSpaceViewProps): JSX.Element {
         >
             {curves.map((curve, curveIdx) => (
                 <Fragment key={curveIdx}>
-                    {curve.map(({ x, y }, pointIdx) => (
+                    {curve.points.map(({ x, y }, pointIdx) => (
                         <circle
                             key={pointIdx}
                             cx={x}

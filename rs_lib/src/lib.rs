@@ -4,7 +4,8 @@ use std::{
 };
 
 use crate::geom::curve::Curve;
-use crate::geom::point::Point;
+use crate::geom::JsCurve;
+use crate::traits::mix::Mix;
 use itertools::{Itertools, TupleWindows};
 use wasm_bindgen::{prelude::*, JsCast};
 use web_sys::{
@@ -14,6 +15,7 @@ use web_sys::{
 
 mod color_maps;
 mod geom;
+mod traits;
 
 const BYTES_PER_FLOAT: i32 = 4;
 
@@ -50,22 +52,6 @@ impl Mul<f32> for Vertex {
             y: self.y * rhs,
             v: self.v * rhs,
         }
-    }
-}
-
-trait Mix {
-    type Output;
-    fn mix(self, other: Self, t: f32) -> Self::Output;
-}
-
-impl<T> Mix for T
-where
-    T: Add<T, Output = T> + Mul<f32, Output = T>,
-{
-    type Output = Self;
-
-    fn mix(self, other: Self, t: f32) -> Self::Output {
-        self * (1.0 - t) + other * t
     }
 }
 
@@ -255,7 +241,7 @@ fn build_index_data(x_len: u32, y_len: u32) -> Vec<u32> {
 #[wasm_bindgen(getter_with_clone)]
 pub struct Plotter {
     context: WebGl2RenderingContext,
-    curves: [Curve<f32>; 2],
+    curves: [Curve; 2],
 
     color_map_uniform: WebGlUniformLocation,
     value_range_uniform: WebGlUniformLocation,
@@ -562,10 +548,8 @@ impl Plotter {
         context.bind_vertex_array(None);
     }
 
-    pub fn update_curves(&mut self, curves: JsValue) {
-        let curves: [Vec<Point<f32>>; 2] =
-            serde_wasm_bindgen::from_value(curves).unwrap();
-        self.curves = curves.map(Curve::from_points);
+    pub fn update_curves(&mut self, curve_1: &JsCurve, curve_2: &JsCurve) {
+        self.curves = [curve_1.clone().into(), curve_2.clone().into()];
     }
 
     pub fn resize(&self, width: i32, height: i32) {

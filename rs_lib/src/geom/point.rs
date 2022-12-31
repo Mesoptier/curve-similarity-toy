@@ -1,32 +1,29 @@
+use super::Dist;
 use approx::{AbsDiffEq, RelativeEq, UlpsEq};
-use num::Float;
 use serde::{Deserialize, Serialize};
 use std::ops::{Add, Mul};
 
 #[derive(Serialize, Deserialize, Copy, Clone, Debug, Default, PartialEq)]
-pub struct Point<T> {
-    x: T,
-    y: T,
+pub struct Point {
+    pub x: Dist,
+    pub y: Dist,
 }
 
-impl<T: Float> Point<T> {
-    pub fn new(x: T, y: T) -> Self {
+impl Point {
+    pub fn new(x: Dist, y: Dist) -> Self {
         Self { x, y }
     }
 
     /// Computes Euclidean distance between the two points.
-    pub fn dist(&self, other: &Point<T>) -> T {
+    pub fn dist(&self, other: &Point) -> Dist {
         ((self.x - other.x).powi(2) + (self.y - other.y).powi(2)).sqrt()
     }
 }
 
-impl<T> Add<Point<T>> for Point<T>
-where
-    T: Add<T, Output = T> + Copy,
-{
-    type Output = Point<T>;
+impl Add<Point> for Point {
+    type Output = Point;
 
-    fn add(self, rhs: Point<T>) -> Self::Output {
+    fn add(self, rhs: Point) -> Self::Output {
         Point {
             x: self.x + rhs.x,
             y: self.y + rhs.y,
@@ -34,13 +31,10 @@ where
     }
 }
 
-impl<T> Mul<T> for Point<T>
-where
-    T: Mul<T, Output = T> + Copy,
-{
-    type Output = Point<T>;
+impl Mul<Dist> for Point {
+    type Output = Point;
 
-    fn mul(self, rhs: T) -> Self::Output {
+    fn mul(self, rhs: Dist) -> Self::Output {
         Point {
             x: self.x * rhs,
             y: self.y * rhs,
@@ -48,28 +42,22 @@ where
     }
 }
 
-impl<T: AbsDiffEq> AbsDiffEq for Point<T>
-where
-    T::Epsilon: Copy,
-{
-    type Epsilon = T::Epsilon;
+impl AbsDiffEq for Point {
+    type Epsilon = <Dist as AbsDiffEq>::Epsilon;
 
     fn default_epsilon() -> Self::Epsilon {
-        T::default_epsilon()
+        Dist::default_epsilon()
     }
 
     fn abs_diff_eq(&self, other: &Self, epsilon: Self::Epsilon) -> bool {
-        T::abs_diff_eq(&self.x, &other.x, epsilon)
-            && T::abs_diff_eq(&self.y, &other.y, epsilon)
+        Dist::abs_diff_eq(&self.x, &other.x, epsilon)
+            && Dist::abs_diff_eq(&self.y, &other.y, epsilon)
     }
 }
 
-impl<T: RelativeEq> RelativeEq for Point<T>
-where
-    T::Epsilon: Copy,
-{
+impl RelativeEq for Point {
     fn default_max_relative() -> Self::Epsilon {
-        T::default_max_relative()
+        Dist::default_max_relative()
     }
 
     fn relative_eq(
@@ -78,17 +66,14 @@ where
         epsilon: Self::Epsilon,
         max_relative: Self::Epsilon,
     ) -> bool {
-        T::relative_eq(&self.x, &other.x, epsilon, max_relative)
-            && T::relative_eq(&self.y, &other.y, epsilon, max_relative)
+        Dist::relative_eq(&self.x, &other.x, epsilon, max_relative)
+            && Dist::relative_eq(&self.y, &other.y, epsilon, max_relative)
     }
 }
 
-impl<T: UlpsEq> UlpsEq for Point<T>
-where
-    T::Epsilon: Copy,
-{
+impl UlpsEq for Point {
     fn default_max_ulps() -> u32 {
-        T::default_max_ulps()
+        Dist::default_max_ulps()
     }
 
     fn ulps_eq(
@@ -97,7 +82,7 @@ where
         epsilon: Self::Epsilon,
         max_ulps: u32,
     ) -> bool {
-        T::ulps_eq(&self.x, &other.x, epsilon, max_ulps)
-            && T::ulps_eq(&self.y, &other.y, epsilon, max_ulps)
+        Dist::ulps_eq(&self.x, &other.x, epsilon, max_ulps)
+            && Dist::ulps_eq(&self.y, &other.y, epsilon, max_ulps)
     }
 }

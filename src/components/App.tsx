@@ -1,21 +1,21 @@
 import { useState } from 'react';
 
+import { JsCurve } from '../../rs_lib/pkg';
 import { CurveSpaceView } from './CurveSpaceView';
-import { type Curve } from '../curves';
 import { ParamSpaceView } from './ParamSpaceView';
 
 export function App(): JSX.Element {
-    const [curves, setCurves] = useState<[Curve, Curve]>([
-        [
+    const [curves, setCurves] = useState<[JsCurve, JsCurve]>([
+        new JsCurve([
             { x: 198, y: 158 },
             { x: 150, y: 248 },
             { x: 91, y: 298 },
-        ],
-        [
+        ]),
+        new JsCurve([
             { x: 227, y: 387 },
             { x: 264, y: 344 },
             { x: 300, y: 214 },
-        ],
+        ]),
     ]);
 
     return (

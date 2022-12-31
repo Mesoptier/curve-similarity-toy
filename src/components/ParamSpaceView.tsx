@@ -1,32 +1,17 @@
-import { type Curve, CURVE_COLORS, type Point } from '../curves';
 import { useEffect, useState } from 'react';
 
-import init, { Plotter } from '../../rs_lib/pkg';
-// @ts-ignore: esbuild is configured to export the filename of the .wasm file
-import wasmFilePath from '../../rs_lib/pkg/rs_lib_bg.wasm';
+import { Plotter, JsCurve,  IPoint } from '../../rs_lib/pkg';
+import { CURVE_COLORS } from '../curves';
 
 interface ParamSpaceViewProps {
-    curves: [Curve, Curve];
+    curves: [JsCurve, JsCurve];
 }
 
 /**
  * Computes Euclidean distance two points.
  */
-function dist(p1: Point, p2: Point): number {
+function dist(p1: IPoint, p2: IPoint): number {
     return Math.sqrt((p1.x - p2.x) ** 2 + (p1.y - p2.y) ** 2);
-}
-
-/**
- * Computes the cumulative arc length of the curve up to each point.
- */
-function computeCumulativeLengths(curve: Curve): number[] {
-    let cumulativeLength = 0;
-    return curve.map((point, pointIdx) => {
-        if (pointIdx !== 0) {
-            cumulativeLength += dist(point, curve[pointIdx - 1]);
-        }
-        return cumulativeLength;
-    });
 }
 
 function makeGridLines(xCoords: number[], yCoords: number[]): string {
@@ -43,12 +28,12 @@ function makeGridLines(xCoords: number[], yCoords: number[]): string {
 export function ParamSpaceView(props: ParamSpaceViewProps): JSX.Element {
     const { curves } = props;
 
-    if (curves.some((curve) => curve.length <= 1)) {
+    if (curves.some((curve) => curve.points.length <= 1)) {
         return null;
     }
 
     const [cumulativeLengths1, cumulativeLengths2] = curves.map(
-        computeCumulativeLengths,
+        (curve) => curve.cumulative_lengths,
     );
 
     const width = cumulativeLengths1[cumulativeLengths1.length - 1];
@@ -92,7 +77,7 @@ export function ParamSpaceView(props: ParamSpaceViewProps): JSX.Element {
 }
 
 interface PlotProps {
-    curves: [Curve, Curve];
+    curves: [JsCurve, JsCurve];
     width: number;
     height: number;
 }
@@ -109,16 +94,17 @@ function Plot(props: PlotProps): JSX.Element {
         }
 
         const ctx = canvas.getContext('webgl2');
-
-        init(new URL(wasmFilePath, import.meta.url)).then(() => {
-            setPlotter(new Plotter(ctx));
-        });
+        setPlotter(new Plotter(ctx));
     }, [canvas]);
 
     useEffect(() => {
-        plotter?.update_curves(curves);
-        plotter?.resize(width, height);
-        plotter?.draw();
+        if (plotter === null) {
+            return;
+        }
+
+        plotter.update_curves(...curves);
+        plotter.resize(width, height);
+        plotter.draw();
     }, [plotter, curves, width, height]);
 
     return <canvas ref={setCanvas} width={width} height={height} />;
