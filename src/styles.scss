@@ -1,16 +1,16 @@
 // Variables
 :root {
-    --background-color: #222;
-    --text-color: #eee;
+    --background-color: #1F271B;
+    --text-color: #F3FCF0;
 
-    --leash-color: green;
-    --grid-color: white;
+    --leash-color: #FFD23F;
+    --grid-color: #FFFFFF;
 }
 [data-curve-idx="0"] {
-    --curve-color: red;
+    --curve-color: #F72585;
 }
 [data-curve-idx="1"] {
-    --curve-color: yellow;
+    --curve-color: #4CC9F0;
 }
 
 // Base
