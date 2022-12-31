@@ -43,9 +43,9 @@ jobs:
         uses: jetli/wasm-pack-action@v0.4.0
 
       - name: Build Wasm
-        run: yarn run build:wasm
+        run: yarn run build:wasm:release
       - name: Build TypeScript
-        run: yarn run build
+        run: yarn run build:release
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v1

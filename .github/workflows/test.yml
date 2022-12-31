@@ -25,7 +25,7 @@ jobs:
         uses: jetli/wasm-pack-action@v0.4.0
 
       - name: Build Wasm
-        run: yarn run build:wasm
+        run: yarn run build:wasm:dev
 
       - name: Check Prettier
         run: yarn test:prettier

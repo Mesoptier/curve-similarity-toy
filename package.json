@@ -4,7 +4,10 @@
   "scripts": {
     "build:wasm": "cross-env WASM_BINDGEN_WEAKREF=1 wasm-pack build rs_lib --target web",
     "build:wasm:dev": "yarn build:wasm --dev",
+    "build:wasm:release": "yarn build:wasm --release",
     "build": "node build.mjs",
+    "build:dev": "yarn build --dev",
+    "build:release": "yarn build --release",
     "watch": "yarn build --watch",
     "serve": "esbuild --servedir=www",
     "prettier": "prettier --write src/",
