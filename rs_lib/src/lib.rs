@@ -373,67 +373,62 @@ impl Plotter {
         // Rebuild index data
         mesh.indices = build_index_data(x_len, y_len);
 
+        // Build isoline data
+        let isoline_vertex_data = make_isolines(&mesh, isoline_threshold);
+
         // Upload min/max values range
         self.context
             .uniform2f(Some(&self.value_range_uniform), min_v, max_v);
 
-        // Upload updated vertex data
-        self.context.bind_buffer(
-            WebGl2RenderingContext::ARRAY_BUFFER,
-            Some(&self.vertex_buffer),
-        );
-        unsafe {
-            // SAFETY: We're creating a view directly into memory, which might
-            // become invalid if we're doing any allocations after this. The
-            // view is used immediately to copy data into a GPU buffer, after
-            // which it is discarded.
-            let vertex_data_array_buf_view =
-                js_sys::Uint8Array::view(mesh.vertices.as_u8_slice());
-            self.context.buffer_data_with_array_buffer_view(
-                WebGl2RenderingContext::ARRAY_BUFFER,
-                &vertex_data_array_buf_view,
-                WebGl2RenderingContext::DYNAMIC_DRAW,
-            );
+        fn upload_buffer_data<T>(
+            context: &WebGl2RenderingContext,
+            buffer: &WebGlBuffer,
+            src_data: &Vec<T>,
+            target: u32,
+            usage: u32,
+        ) {
+            context.bind_buffer(target, Some(&buffer));
+            unsafe {
+                // SAFETY: We're creating a view directly into memory, which might
+                // become invalid if we're doing any allocations after this. The
+                // view is used immediately to copy data into a GPU buffer, after
+                // which it is discarded.
+                let array_buffer_view =
+                    js_sys::Uint8Array::view(src_data.as_u8_slice());
+                context.buffer_data_with_array_buffer_view(
+                    target,
+                    &array_buffer_view,
+                    usage,
+                );
+            }
         }
+
+        // Upload updated vertex data
+        upload_buffer_data(
+            &self.context,
+            &self.vertex_buffer,
+            &mesh.vertices,
+            WebGl2RenderingContext::ARRAY_BUFFER,
+            WebGl2RenderingContext::STATIC_DRAW,
+        );
 
         // Upload updated index data
-        self.context.bind_buffer(
+        upload_buffer_data(
+            &self.context,
+            &self.index_buffer,
+            &mesh.indices,
             WebGl2RenderingContext::ELEMENT_ARRAY_BUFFER,
-            Some(&self.index_buffer),
+            WebGl2RenderingContext::STATIC_DRAW,
         );
-        unsafe {
-            // SAFETY: We're creating a view directly into memory, which might
-            // become invalid if we're doing any allocations after this. The
-            // view is used immediately to copy data into a GPU buffer, after
-            // which it is discarded.
-            let index_data_array_buf_view =
-                js_sys::Uint8Array::view(mesh.indices.as_u8_slice());
-            self.context.buffer_data_with_array_buffer_view(
-                WebGl2RenderingContext::ELEMENT_ARRAY_BUFFER,
-                &index_data_array_buf_view,
-                WebGl2RenderingContext::STATIC_DRAW,
-            )
-        }
 
-        // Build and upload vertex data for isolines
-        let isoline_vertex_data = make_isolines(&mesh, isoline_threshold);
-        self.context.bind_buffer(
+        // Upload vertex data for isolines
+        upload_buffer_data(
+            &self.context,
+            &self.isoline_vertex_buffer,
+            &isoline_vertex_data,
             WebGl2RenderingContext::ARRAY_BUFFER,
-            Some(&self.isoline_vertex_buffer),
+            WebGl2RenderingContext::STATIC_DRAW,
         );
-        unsafe {
-            // SAFETY: We're creating a view directly into memory, which might
-            // become invalid if we're doing any allocations after this. The
-            // view is used immediately to copy data into a GPU buffer, after
-            // which it is discarded.
-            let isoline_vertex_data_array_buf_view =
-                js_sys::Uint8Array::view(isoline_vertex_data.as_u8_slice());
-            self.context.buffer_data_with_array_buffer_view(
-                WebGl2RenderingContext::ARRAY_BUFFER,
-                &isoline_vertex_data_array_buf_view,
-                WebGl2RenderingContext::DYNAMIC_DRAW,
-            );
-        }
     }
 
     pub fn draw(&self) {
