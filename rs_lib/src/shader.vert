@@ -15,7 +15,7 @@ void main() {
 
     float value = (a_value - min_value) / (max_value - min_value);
 
-    vec3 color = vec3(0., 1., 0.);
+    vec3 color;
     for (int idx = 1; idx < MAX_COLORS; idx++) {
         if (value < u_color_map[idx].w) {
             float w = (value - u_color_map[idx - 1].w) / (u_color_map[idx].w - u_color_map[idx - 1].w);
