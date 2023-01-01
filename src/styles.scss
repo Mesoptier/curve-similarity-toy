@@ -1,8 +1,11 @@
 // Variables
 :root {
+    --text-color: #F3FCF0;
     --background-color: #181E15;
     --space-view-background-color: #1F271B;
-    --text-color: #F3FCF0;
+    --space-view-box-shadow:
+        inset 0 1px 1px #{rgba(#9ec089, 0.1)},
+        inset 0 0 0 1px #{rgba(#9ec089, 0.2)};
 
     --leash-color: #FFD23F;
     --grid-color: #FFFFFF;
@@ -12,6 +15,27 @@
 }
 [data-curve-idx="1"] {
     --curve-color: #4CC9F0;
+}
+
+@media (prefers-color-scheme: light) {
+    :root {
+        --text-color: #181E15;
+        --background-color: #e8f1e3;
+        --space-view-background-color: #f8fff5;
+        --space-view-box-shadow:
+            0 2px 3px #{rgba(#181E15, 0.05)},
+            inset 0 0 0 1px #{rgba(#181E15, 0.15)};
+
+        --leash-color: #09E85E;
+        --grid-color: #111;
+    }
+
+    [data-curve-idx="0"] {
+        --curve-color: #d91b72;
+    }
+    [data-curve-idx="1"] {
+        --curve-color: #1d9bc4;
+    }
 }
 
 // Base
@@ -54,9 +78,7 @@ body {
 
     background-color: var(--space-view-background-color);
     border-radius: 8px;
-
-    $box-shadow-color: #9ec089;
-    box-shadow: inset 0 1px 1px rgba($box-shadow-color, 0.1), inset 0 0 0 1px rgba($box-shadow-color, 0.2);
+    box-shadow: var(--space-view-box-shadow);
 }
 
 // Curves
