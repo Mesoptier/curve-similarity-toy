@@ -448,6 +448,7 @@ impl Plotter {
         self.context
             .uniform2f(Some(&self.value_range_uniform), min_v, max_v);
 
+        // TODO: Get gradient from CSS custom property, so it can change according to `prefers-color-scheme` media query
         // Colors generated using https://www.learnui.design/tools/gradient-generator.html
         let colors = "#1e2a4f, #053963, #004975, #005984, #006a8f, #007a94, #008a94, #009a8e, #00a984, #00b777, #51c467, #85cf57".split(", ").collect::<Vec<_>>();
         let colors_len = colors.len();
