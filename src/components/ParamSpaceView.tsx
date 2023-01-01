@@ -39,9 +39,11 @@ export function ParamSpaceView(props: ParamSpaceViewProps): JSX.Element {
     const width = cumulativeLengths1[cumulativeLengths1.length - 1];
     const height = cumulativeLengths2[cumulativeLengths2.length - 1];
 
+    const totalHeight = Math.floor(height) + PLOT_OFFSET + CURVE_OFFSET;
+
     return (
-        <svg width={500} height={500} style={{ border: '1px solid gray' }}>
-            <g transform="translate(0, 500) scale(1, -1)">
+        <svg className="space-view">
+            <g transform={`translate(0, ${totalHeight}) scale(1, -1)`}>
                 {/* Flattened curves along axes */}
                 {[
                     cumulativeLengths1.map((x) => ({ x, y: 0 })),

@@ -23,7 +23,7 @@ export function App(): JSX.Element {
     >(null);
 
     return (
-        <div style={{ display: 'flex' }}>
+        <div className="space-view-container">
             <CurveSpaceView
                 curves={curves}
                 updateCurves={setCurves}

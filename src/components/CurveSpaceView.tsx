@@ -47,8 +47,7 @@ export function CurveSpaceView(props: CurveSpaceViewProps): JSX.Element {
 
     return (
         <svg
-            width={500}
-            height={500}
+            className="space-view"
             onClick={(e) => {
                 const curveIdx = e.ctrlKey ? 1 : 0;
                 const newPoint = {
@@ -76,7 +75,6 @@ export function CurveSpaceView(props: CurveSpaceViewProps): JSX.Element {
             onMouseLeave={() => {
                 setPreviewPoints([null, null]);
             }}
-            style={{ border: '1px solid gray' }}
         >
             {curves.map((curve, curveIdx) => (
                 <CurvePreview
