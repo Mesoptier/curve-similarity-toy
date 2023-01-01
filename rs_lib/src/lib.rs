@@ -1,6 +1,8 @@
 use std::ops::{Add, Mul};
+use std::str::FromStr;
 
 use itertools::{Itertools, TupleWindows};
+use palette::{Pixel, Srgb};
 use wasm_bindgen::{prelude::*, JsCast};
 use web_sys::{
     WebGl2RenderingContext, WebGlBuffer, WebGlProgram, WebGlShader,
@@ -12,7 +14,6 @@ use crate::geom::JsCurve;
 use crate::traits::mix::Mix;
 use crate::traits::vec_ext::VecExt;
 
-mod color_maps;
 mod geom;
 mod traits;
 
@@ -447,10 +448,24 @@ impl Plotter {
         self.context
             .uniform2f(Some(&self.value_range_uniform), min_v, max_v);
 
+        // Colors generated using https://www.learnui.design/tools/gradient-generator.html
+        let colors = "#1e2a4f, #053963, #004975, #005984, #006a8f, #007a94, #008a94, #009a8e, #00a984, #00b777, #51c467, #85cf57".split(", ").collect::<Vec<_>>();
+        let colors_len = colors.len();
+        let color_map_data = colors
+            .into_iter()
+            .enumerate()
+            .flat_map(|(color_idx, hex)| {
+                let w = color_idx as f32 / (colors_len - 1) as f32;
+                let [r, g, b]: [f32; 3] =
+                    Srgb::from_str(hex).unwrap().into_format().into_raw();
+                [r, g, b, w]
+            })
+            .collect::<Vec<_>>();
+
         // Update color map
-        context.uniform3fv_with_f32_array(
+        context.uniform4fv_with_f32_array(
             Some(&self.color_map_uniform),
-            &color_maps::COLOR_MAP_MAGMA,
+            &color_map_data,
         );
 
         // Draw

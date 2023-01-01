@@ -4,9 +4,9 @@ in vec4 a_position;
 in float a_value;
 out vec4 v_color;
 
-#define NUM_COLORS 256
+#define MAX_COLORS 16
 
-uniform vec3 u_color_map[NUM_COLORS];
+uniform vec4 u_color_map[MAX_COLORS];
 uniform vec2 u_value_range;
 
 void main() {
@@ -15,9 +15,14 @@ void main() {
 
     float value = (a_value - min_value) / (max_value - min_value);
 
-    // TODO: Actually interpolate colors?
-    int color_idx = int(value * float(NUM_COLORS - 1));
-    vec3 color = u_color_map[color_idx];
+    vec3 color = vec3(0., 1., 0.);
+    for (int idx = 1; idx < MAX_COLORS; idx++) {
+        if (value < u_color_map[idx].w) {
+            float w = (value - u_color_map[idx - 1].w) / (u_color_map[idx].w - u_color_map[idx - 1].w);
+            color = mix(u_color_map[idx - 1].rgb, u_color_map[idx].rgb, w);
+            break;
+        }
+    }
 
     v_color = vec4(color, 1.0);
     gl_Position = a_position;
