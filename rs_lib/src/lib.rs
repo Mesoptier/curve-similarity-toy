@@ -1,17 +1,16 @@
-use std::{
-    mem,
-    ops::{Add, Mul},
-};
+use std::ops::{Add, Mul};
 
-use crate::geom::curve::Curve;
-use crate::geom::JsCurve;
-use crate::traits::mix::Mix;
 use itertools::{Itertools, TupleWindows};
 use wasm_bindgen::{prelude::*, JsCast};
 use web_sys::{
     WebGl2RenderingContext, WebGlBuffer, WebGlProgram, WebGlShader,
     WebGlUniformLocation, WebGlVertexArrayObject,
 };
+
+use crate::geom::curve::Curve;
+use crate::geom::JsCurve;
+use crate::traits::mix::Mix;
+use crate::traits::vec_ext::VecExt;
 
 mod color_maps;
 mod geom;
@@ -153,20 +152,6 @@ fn make_isolines(mesh: &TriangleMesh, threshold: f32) -> Vec<Vertex> {
     }
 
     isoline_vertices
-}
-
-trait VecExt<T>
-where
-    T: Sized,
-{
-    unsafe fn as_u8_slice(&self) -> &[u8];
-}
-
-impl<T> VecExt<T> for Vec<T> {
-    unsafe fn as_u8_slice(&self) -> &[u8] {
-        let num_bytes = self.len() * mem::size_of::<T>();
-        std::slice::from_raw_parts(self.as_ptr() as *const u8, num_bytes)
-    }
 }
 
 /// Builds the lattice of vertices used by the triangle mesh.
