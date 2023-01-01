@@ -2,6 +2,9 @@ import { type Dispatch, type SetStateAction, useEffect, useState } from 'react';
 
 import { Plotter, JsCurve } from '@rs_lib';
 
+const CURVE_OFFSET = 20;
+const PLOT_OFFSET = 40;
+
 interface ParamSpaceViewProps {
     curves: [JsCurve, JsCurve];
     highlightLeash: [number, number] | null;
@@ -50,8 +53,8 @@ export function ParamSpaceView(props: ParamSpaceViewProps): JSX.Element {
                         data-curve-idx={curveIdx}
                         transform={
                             curveIdx === 0
-                                ? 'translate(20, 10)'
-                                : 'translate(10, 20)'
+                                ? `translate(${PLOT_OFFSET}, ${CURVE_OFFSET})`
+                                : `translate(${CURVE_OFFSET}, ${PLOT_OFFSET})`
                         }
                     >
                         <line
@@ -75,8 +78,8 @@ export function ParamSpaceView(props: ParamSpaceViewProps): JSX.Element {
                 {/* Plot canvas */}
                 <foreignObject
                     className="plot-canvas"
-                    x={20}
-                    y={20}
+                    x={PLOT_OFFSET}
+                    y={PLOT_OFFSET}
                     width={width}
                     height={height}
                     onMouseMove={(e) => {
@@ -98,7 +101,7 @@ export function ParamSpaceView(props: ParamSpaceViewProps): JSX.Element {
                 {/* Plot overlay */}
                 <g
                     className="plot-overlay"
-                    transform="translate(20, 20)"
+                    transform={`translate(${PLOT_OFFSET}, ${PLOT_OFFSET})`}
                 >
                     <path
                         className="grid-lines"
@@ -111,7 +114,7 @@ export function ParamSpaceView(props: ParamSpaceViewProps): JSX.Element {
                         <g className="leash">
                             <line
                                 className="leash__line leash__line--dashed"
-                                x1={-10}
+                                x1={-(PLOT_OFFSET - CURVE_OFFSET)}
                                 y1={highlightLeash[1]}
                                 x2={highlightLeash[0]}
                                 y2={highlightLeash[1]}
@@ -119,7 +122,7 @@ export function ParamSpaceView(props: ParamSpaceViewProps): JSX.Element {
                             <line
                                 className="leash__line leash__line--dashed"
                                 x1={highlightLeash[0]}
-                                y1={-10}
+                                y1={-(PLOT_OFFSET - CURVE_OFFSET)}
                                 x2={highlightLeash[0]}
                                 y2={highlightLeash[1]}
                             />
@@ -130,13 +133,13 @@ export function ParamSpaceView(props: ParamSpaceViewProps): JSX.Element {
                             />
                             <circle
                                 className="leash__point"
-                                cx={-10}
+                                cx={-(PLOT_OFFSET - CURVE_OFFSET)}
                                 cy={highlightLeash[1]}
                             />
                             <circle
                                 className="leash__point"
                                 cx={highlightLeash[0]}
-                                cy={-10}
+                                cy={-(PLOT_OFFSET - CURVE_OFFSET)}
                             />
                         </g>
                     )}
