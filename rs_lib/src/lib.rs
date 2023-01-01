@@ -224,7 +224,6 @@ pub struct Plotter {
     isoline_vertex_buffer: WebGlBuffer,
 
     vao_triangles: WebGlVertexArrayObject,
-    vao_lines: WebGlVertexArrayObject,
     vao_isolines: WebGlVertexArrayObject,
 }
 
@@ -307,36 +306,6 @@ impl Plotter {
 
         context.bind_vertex_array(None);
 
-        // Init: setup VertexArrayObject for mesh lines of main triangle mesh
-        let vao_lines = context
-            .create_vertex_array()
-            .ok_or("Could not create vertex array object")?;
-        context.bind_vertex_array(Some(&vao_lines));
-
-        context.bind_buffer(
-            WebGl2RenderingContext::ARRAY_BUFFER,
-            Some(&vertex_buffer),
-        );
-        context.bind_buffer(
-            WebGl2RenderingContext::ELEMENT_ARRAY_BUFFER,
-            Some(&index_buffer),
-        );
-
-        context.enable_vertex_attrib_array(position_attribute);
-        context.vertex_attrib_pointer_with_i32(
-            position_attribute,
-            FLOATS_PER_POSITION,
-            WebGl2RenderingContext::FLOAT,
-            false,
-            FLOATS_PER_VERTEX * BYTES_PER_FLOAT,
-            0,
-        );
-
-        // TODO: Use alternative vertex shader with a color uniform instead of a value attribute
-        context.vertex_attrib1f(value_attribute, 0.0);
-
-        context.bind_vertex_array(None);
-
         // Init: setup VertexArrayObject for isolines
         let vao_isolines = context
             .create_vertex_array()
@@ -375,7 +344,6 @@ impl Plotter {
             isoline_vertex_buffer,
 
             vao_triangles,
-            vao_lines,
             vao_isolines,
         })
     }
@@ -502,14 +470,6 @@ impl Plotter {
             WebGl2RenderingContext::UNSIGNED_INT,
             0,
         );
-
-        // context.bind_vertex_array(Some(&self.vao_lines));
-        // context.draw_elements_with_i32(
-        //     WebGl2RenderingContext::LINE_STRIP,
-        //     index_data_len as i32,
-        //     WebGl2RenderingContext::UNSIGNED_INT,
-        //     0,
-        // );
 
         // context.bind_vertex_array(Some(&self.vao_isolines));
         // context.draw_arrays(
