@@ -348,10 +348,20 @@ impl Plotter {
         })
     }
 
-    fn update_buffers(&self, x_len: u32, y_len: u32) {
-        let mut mesh = TriangleMesh::new();
+    pub fn draw(&self) {
+        let context = &self.context;
 
-        let isoline_threshold = 0.5;
+        let canvas: web_sys::HtmlCanvasElement = context
+            .canvas()
+            .unwrap()
+            .dyn_into::<web_sys::HtmlCanvasElement>()
+            .unwrap();
+
+        let res = 4;
+        let x_len = canvas.width() / res;
+        let y_len = canvas.height() / res;
+
+        let mut mesh = TriangleMesh::new();
 
         let mut min_v = f32::INFINITY;
         let mut max_v = f32::NEG_INFINITY;
@@ -373,12 +383,15 @@ impl Plotter {
         // Rebuild index data
         mesh.indices = build_index_data(x_len, y_len);
 
-        // Build isoline data
-        let isoline_vertex_data = make_isolines(&mesh, isoline_threshold);
-
-        // Upload min/max values range
-        self.context
-            .uniform2f(Some(&self.value_range_uniform), min_v, max_v);
+        // Build isoline data;
+        let isoline_vertex_data = [
+            min_v + (max_v - min_v) * 0.25,
+            min_v + (max_v - min_v) * 0.50,
+            min_v + (max_v - min_v) * 0.75,
+        ]
+        .into_iter()
+        .flat_map(|threshold| make_isolines(&mesh, threshold))
+        .collect();
 
         fn upload_buffer_data<T>(
             context: &WebGl2RenderingContext,
@@ -429,30 +442,16 @@ impl Plotter {
             WebGl2RenderingContext::ARRAY_BUFFER,
             WebGl2RenderingContext::STATIC_DRAW,
         );
-    }
 
-    pub fn draw(&self) {
-        let context = &self.context;
-
-        let canvas: web_sys::HtmlCanvasElement = context
-            .canvas()
-            .unwrap()
-            .dyn_into::<web_sys::HtmlCanvasElement>()
-            .unwrap();
-
-        let res = 8;
-        let x_len = canvas.width() / res;
-        let y_len = canvas.height() / res;
-
-        self.update_buffers(x_len, y_len);
+        // Upload min/max values range
+        self.context
+            .uniform2f(Some(&self.value_range_uniform), min_v, max_v);
 
         // Update color map
         context.uniform3fv_with_f32_array(
             Some(&self.color_map_uniform),
             &color_maps::COLOR_MAP_MAGMA,
         );
-
-        let index_data_len = 2 * (x_len * (y_len - 1) + (y_len - 2)) as usize;
 
         // Draw
         context.clear_color(0.0, 0.0, 0.0, 1.0);
@@ -461,17 +460,17 @@ impl Plotter {
         context.bind_vertex_array(Some(&self.vao_triangles));
         context.draw_elements_with_i32(
             WebGl2RenderingContext::TRIANGLE_STRIP,
-            index_data_len as i32,
+            mesh.indices.len() as i32,
             WebGl2RenderingContext::UNSIGNED_INT,
             0,
         );
 
-        // context.bind_vertex_array(Some(&self.vao_isolines));
-        // context.draw_arrays(
-        //     WebGl2RenderingContext::LINES,
-        //     0,
-        //     isoline_vertex_data.len() as i32,
-        // );
+        context.bind_vertex_array(Some(&self.vao_isolines));
+        context.draw_arrays(
+            WebGl2RenderingContext::LINES,
+            0,
+            isoline_vertex_data.len() as i32,
+        );
 
         context.bind_vertex_array(None);
     }
