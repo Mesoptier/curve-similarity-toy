@@ -169,11 +169,6 @@ impl<T> VecExt<T> for Vec<T> {
     }
 }
 
-/// The function to plot.
-fn f(x: f32, y: f32, t: f32) -> f32 {
-    ((x * y * 10.0 + t).sin() + 1.0) / 2.0
-}
-
 /// Builds the lattice of vertices used by the triangle mesh.
 fn build_vertex_data<F: FnMut(f32, f32) -> f32>(
     x_len: u32,
@@ -203,13 +198,6 @@ fn build_vertex_data<F: FnMut(f32, f32) -> f32>(
     vertex_data
 }
 
-/// Updates the values in the lattice of vertices used by the triangle mesh in-place.
-fn update_vertex_data(t: f32, vertex_data: &mut Vec<Vertex>) {
-    for vertex in vertex_data {
-        vertex.v = f(vertex.x, vertex.y, t);
-    }
-}
-
 /// Builds the list of indices (of vertices in the mesh) to be interpreted as a triangle strip by
 /// WebGL.
 fn build_index_data(x_len: u32, y_len: u32) -> Vec<u32> {
@@ -219,17 +207,17 @@ fn build_index_data(x_len: u32, y_len: u32) -> Vec<u32> {
     for y in 0..(y_len - 1) {
         if y > 0 {
             // Degenerate begin: repeat first vertex
-            index_data.push((y * x_len));
+            index_data.push(y * x_len);
         }
 
         for x in 0..x_len {
-            index_data.push(((y * x_len) + x));
-            index_data.push((((y + 1) * x_len) + x));
+            index_data.push((y * x_len) + x);
+            index_data.push(((y + 1) * x_len) + x);
         }
 
         if y < y_len - 2 {
             // Degenerate end: repeat last vertex
-            index_data.push((((y + 1) * x_len) + (x_len - 1)));
+            index_data.push(((y + 1) * x_len) + (x_len - 1));
         }
     }
 

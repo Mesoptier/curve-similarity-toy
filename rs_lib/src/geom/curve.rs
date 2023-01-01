@@ -85,18 +85,18 @@ mod test {
     #[test]
     fn curve_at() {
         let points = vec![
-            Point::new(0.0, 0.0),
-            Point::new(1.0, 0.0),
-            Point::new(1.5, 0.0),
-            Point::new(2.0, 0.0),
+            Point { x: 0.0, y: 0.0 },
+            Point { x: 1.0, y: 0.0 },
+            Point { x: 1.5, y: 0.0 },
+            Point { x: 2.0, y: 0.0 },
         ];
         let curve = Curve::from_points(points);
 
-        assert_relative_eq!(curve.at(0.0), Point::new(0.0, 0.0));
-        assert_relative_eq!(curve.at(0.5), Point::new(0.5, 0.0));
-        assert_relative_eq!(curve.at(1.0), Point::new(1.0, 0.0));
-        assert_relative_eq!(curve.at(1.5), Point::new(1.5, 0.0));
-        assert_relative_eq!(curve.at(1.8), Point::new(1.8, 0.0));
-        assert_relative_eq!(curve.at(2.0), Point::new(2.0, 0.0));
+        assert_relative_eq!(curve.at(0.0), Point { x: 0.0, y: 0.0 });
+        assert_relative_eq!(curve.at(0.5), Point { x: 0.5, y: 0.0 });
+        assert_relative_eq!(curve.at(1.0), Point { x: 1.0, y: 0.0 });
+        assert_relative_eq!(curve.at(1.5), Point { x: 1.5, y: 0.0 });
+        assert_relative_eq!(curve.at(1.8), Point { x: 1.8, y: 0.0 });
+        assert_relative_eq!(curve.at(2.0), Point { x: 2.0, y: 0.0 });
     }
 }

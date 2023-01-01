@@ -10,10 +10,6 @@ pub struct Point {
 }
 
 impl Point {
-    pub fn new(x: Dist, y: Dist) -> Self {
-        Self { x, y }
-    }
-
     /// Computes Euclidean distance between the two points.
     pub fn dist(&self, other: &Point) -> Dist {
         ((self.x - other.x).powi(2) + (self.y - other.y).powi(2)).sqrt()
