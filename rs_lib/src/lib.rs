@@ -329,9 +329,16 @@ impl Plotter {
         );
 
         // TODO: Use alternative vertex shader with a color uniform instead of a value attribute
-        context.vertex_attrib1f(value_attribute, 0.0);
+        context.vertex_attrib1f(value_attribute, -1.0);
 
         context.bind_vertex_array(None);
+
+        // Enable blending
+        context.enable(WebGl2RenderingContext::BLEND);
+        context.blend_func(
+            WebGl2RenderingContext::SRC_ALPHA,
+            WebGl2RenderingContext::ONE_MINUS_SRC_ALPHA,
+        );
 
         Ok(Self {
             context,
