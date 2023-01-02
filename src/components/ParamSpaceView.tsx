@@ -15,12 +15,12 @@ function makeGridLines(xCoords: number[], yCoords: number[]): string {
     const verticalLines = xCoords
         .filter((_, index, array) => index !== 0 && index !== array.length - 1)
         .map((x) => Math.round(x - 0.5) + 0.5)
-        .map((x) => `M${x} 0V${Math.floor(yCoords[yCoords.length - 1])}`)
+        .map((x) => `M${x} 0V${Math.round(yCoords[yCoords.length - 1])}`)
         .join('');
     const horizontalLines = yCoords
         .filter((_, index, array) => index !== 0 && index !== array.length - 1)
         .map((y) => Math.round(y - 0.5) + 0.5)
-        .map((y) => `M0 ${y}H${Math.floor(xCoords[xCoords.length - 1])}`)
+        .map((y) => `M0 ${y}H${Math.round(xCoords[xCoords.length - 1])}`)
         .join('');
     return verticalLines + horizontalLines;
 }
@@ -82,8 +82,8 @@ export function ParamSpaceView(props: ParamSpaceViewProps): JSX.Element {
                     className="plot-canvas"
                     x={PLOT_OFFSET}
                     y={PLOT_OFFSET}
-                    width={width}
-                    height={height}
+                    width={Math.round(width)}
+                    height={Math.round(height)}
                     onMouseMove={(e) => {
                         const { x, y, height } =
                             e.currentTarget.getBoundingClientRect();
@@ -97,7 +97,11 @@ export function ParamSpaceView(props: ParamSpaceViewProps): JSX.Element {
                         setHighlightLeash(null);
                     }}
                 >
-                    <Plot curves={curves} width={width} height={height} />
+                    <Plot
+                        curves={curves}
+                        width={Math.round(width)}
+                        height={Math.round(height)}
+                    />
                 </foreignObject>
 
                 {/* Plot overlay */}

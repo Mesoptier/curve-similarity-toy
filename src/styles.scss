@@ -121,7 +121,8 @@ body {
 
 // Plot
 .plot-canvas {
-    border: 1px solid var(--grid-color);
+    box-shadow: 0 0 0 1px var(--grid-color);
+    border-radius: 1px;
 }
 
 .plot-overlay {
