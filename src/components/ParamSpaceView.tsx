@@ -172,7 +172,7 @@ function Plot(props: PlotProps): JSX.Element {
             return;
         }
 
-        const ctx = canvas.getContext('webgl2');
+        const ctx = canvas.getContext('webgl2', { alpha: false });
         setPlotter(new Plotter(ctx));
     }, [canvas]);
 
