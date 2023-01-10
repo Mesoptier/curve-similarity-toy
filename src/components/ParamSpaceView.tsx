@@ -6,12 +6,17 @@ const CURVE_OFFSET = 20;
 const PLOT_OFFSET = 40;
 
 interface ParamSpaceViewCanvasProps {
+    containerSize: { width: number; height: number };
+
     curves: [JsCurve, JsCurve];
     highlightLeash: [number, number] | null;
     setHighlightLeash: Dispatch<SetStateAction<[number, number] | null>>;
 }
 
-type ParamSpaceViewProps = ParamSpaceViewCanvasProps;
+type ParamSpaceViewProps = Pick<
+    ParamSpaceViewCanvasProps,
+    'curves' | 'highlightLeash' | 'setHighlightLeash'
+>;
 
 function makeGridLines(xCoords: number[], yCoords: number[]): string {
     const verticalLines = xCoords
@@ -29,33 +34,59 @@ function makeGridLines(xCoords: number[], yCoords: number[]): string {
 
 export function ParamSpaceView(props: ParamSpaceViewProps): JSX.Element {
     const { curves, ...otherProps } = props;
+
+    const [container, setContainer] = useState<HTMLElement | null>(null);
+    const [containerSize, setContainerSize] = useState<{
+        width: number;
+        height: number;
+    }>({ width: 0, height: 0 });
+
+    useEffect(() => {
+        if (container === null) {
+            return;
+        }
+
+        const observer = new ResizeObserver((entries) => {
+            const { width, height } = entries[0].contentRect;
+            setContainerSize({ width, height });
+        });
+        observer.observe(container, { box: 'border-box' });
+        return () => {
+            observer.disconnect();
+        };
+    }, [container]);
+
     return (
         <div className="space-view">
             <header className="space-view__header">
                 <div className="space-view__title">Parameter space</div>
             </header>
-            {curves.every((curve) => curve.points.length > 1) && (
-                <ParamSpaceViewCanvas curves={curves} {...otherProps} />
-            )}
+            <div ref={setContainer} className="space-view__canvas">
+                {curves.every((curve) => curve.points.length > 1) && (
+                    <ParamSpaceViewCanvas
+                        containerSize={containerSize}
+                        curves={curves}
+                        {...otherProps}
+                    />
+                )}
+            </div>
         </div>
     );
 }
 
 function ParamSpaceViewCanvas(props: ParamSpaceViewCanvasProps): JSX.Element {
-    const { curves, highlightLeash, setHighlightLeash } = props;
+    const { containerSize, curves, highlightLeash, setHighlightLeash } = props;
 
     const [cumulativeLengths1, cumulativeLengths2] = curves.map(
         (curve) => curve.cumulative_lengths,
     );
 
-    const width = cumulativeLengths1[cumulativeLengths1.length - 1];
-    const height = cumulativeLengths2[cumulativeLengths2.length - 1];
-
-    const totalHeight = Math.floor(height) + PLOT_OFFSET + CURVE_OFFSET;
+    const plotWidth = cumulativeLengths1[cumulativeLengths1.length - 1];
+    const plotHeight = cumulativeLengths2[cumulativeLengths2.length - 1];
 
     return (
-        <svg className="space-view__canvas">
-            <g transform={`translate(0, ${totalHeight}) scale(1, -1)`}>
+        <svg>
+            <g transform={`translate(0, ${containerSize.height}) scale(1, -1)`}>
                 {/* Flattened curves along axes */}
                 {[
                     cumulativeLengths1.map((x) => ({ x, y: 0 })),
@@ -94,8 +125,8 @@ function ParamSpaceViewCanvas(props: ParamSpaceViewCanvasProps): JSX.Element {
                     className="plot-canvas"
                     x={PLOT_OFFSET}
                     y={PLOT_OFFSET}
-                    width={Math.round(width)}
-                    height={Math.round(height)}
+                    width={Math.round(plotWidth)}
+                    height={Math.round(plotHeight)}
                     onMouseMove={(e) => {
                         const { x, y, height } =
                             e.currentTarget.getBoundingClientRect();
@@ -111,8 +142,8 @@ function ParamSpaceViewCanvas(props: ParamSpaceViewCanvasProps): JSX.Element {
                 >
                     <Plot
                         curves={curves}
-                        width={Math.round(width)}
-                        height={Math.round(height)}
+                        width={Math.round(plotWidth)}
+                        height={Math.round(plotHeight)}
                     />
                 </foreignObject>
 

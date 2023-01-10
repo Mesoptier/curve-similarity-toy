@@ -55,7 +55,7 @@ body,
 }
 
 html {
-    font-family: "Work Sans", sans-serif;
+    font-family: 'Work Sans', sans-serif;
     color-scheme: dark;
 }
 
@@ -79,7 +79,7 @@ body {
 }
 
 .space-view {
-    flex: 1 0 auto;
+    flex: 1 0 0;
     display: flex;
     flex-direction: column;
 
@@ -102,6 +102,11 @@ body {
 .space-view__canvas {
     width: 100%;
     height: 100%;
+
+    & > svg {
+        width: 100%;
+        height: 100%;
+    }
 }
 
 // Curves

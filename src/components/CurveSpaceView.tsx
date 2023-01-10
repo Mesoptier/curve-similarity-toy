@@ -26,7 +26,9 @@ export function CurveSpaceView(props: CurveSpaceViewProps): JSX.Element {
             <header className="space-view__header">
                 <div className="space-view__title">Curves space</div>
             </header>
-            <CurveSpaceViewCanvas {...props} />
+            <div className="space-view__canvas">
+                <CurveSpaceViewCanvas {...props} />
+            </div>
         </div>
     );
 }
@@ -60,7 +62,6 @@ function CurveSpaceViewCanvas(props: CurveSpaceViewCanvasProps): JSX.Element {
 
     return (
         <svg
-            className="space-view__canvas"
             onClick={(e) => {
                 const curveIdx = e.ctrlKey ? 1 : 0;
                 const newPoint = {
