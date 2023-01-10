@@ -1,16 +1,17 @@
+use std::iter;
 use std::ops::{Add, Mul};
 use std::str::FromStr;
 
 use itertools::{Itertools, TupleWindows};
 use palette::{Pixel, Srgb};
-use wasm_bindgen::{prelude::*, JsCast};
+use wasm_bindgen::prelude::*;
 use web_sys::{
     WebGl2RenderingContext, WebGlBuffer, WebGlProgram, WebGlShader,
     WebGlUniformLocation, WebGlVertexArrayObject,
 };
 
 use crate::geom::curve::Curve;
-use crate::geom::JsCurve;
+use crate::geom::{Dist, JsCurve};
 use crate::traits::mix::Mix;
 use crate::traits::vec_ext::VecExt;
 
@@ -155,26 +156,51 @@ fn make_isolines(mesh: &TriangleMesh, threshold: f32) -> Vec<Vertex> {
     isoline_vertices
 }
 
+fn subdivide_lengths(lengths: &Vec<Dist>, res: Dist) -> Vec<Dist> {
+    if lengths.is_empty() {
+        return vec![];
+    }
+
+    iter::once(*lengths.first().unwrap())
+        .chain(
+            lengths
+                .iter()
+                .tuple_windows::<(_, _)>()
+                .flat_map(|(l1, l2)| {
+                    // Note: since `num_subdivisions` is 0 if both lengths are equal, this
+                    // effectively also deduplicates the lengths
+                    let num_subdivisions = ((l2 - l1) / res).ceil() as usize;
+                    (0..num_subdivisions).map(move |i| {
+                        let t = (i + 1) as Dist / (num_subdivisions as Dist);
+                        l1 * (1. - t) + l2 * t
+                    })
+                }),
+        )
+        .collect()
+}
+
 /// Builds the lattice of vertices used by the triangle mesh.
-fn build_vertex_data<F: FnMut(f32, f32) -> f32>(
-    x_len: u32,
-    y_len: u32,
+fn build_vertex_data<F>(
+    x_lengths: &Vec<Dist>,
+    y_lengths: &Vec<Dist>,
     mut f: F,
-) -> Vec<Vertex> {
-    let vertex_data_len = (x_len * y_len) as usize;
+) -> Vec<Vertex>
+where
+    F: FnMut(Dist, Dist) -> Dist,
+{
+    let vertex_data_len = (x_lengths.len() * y_lengths.len()) as usize;
     let mut vertex_data: Vec<Vertex> = Vec::with_capacity(vertex_data_len);
 
-    for y_idx in 0..y_len {
-        for x_idx in 0..x_len {
-            let x: f32 = x_idx as f32 / (x_len - 1) as f32;
-            let y: f32 = y_idx as f32 / (y_len - 1) as f32;
+    let max_x_length = *x_lengths.last().unwrap();
+    let max_y_length = *y_lengths.last().unwrap();
 
-            // TODO: Scale x,y to curve lengths?
-            let v = f(x, y);
+    for y_length in y_lengths {
+        for x_length in x_lengths {
+            let v = f(*x_length, *y_length);
 
-            let x = x * 2.0 - 1.0;
-            let y = y * 2.0 - 1.0;
-
+            // Scale coords to [-1, 1]
+            let x = (x_length / max_x_length) * 2.0 - 1.0;
+            let y = (y_length / max_y_length) * 2.0 - 1.0;
             vertex_data.push(Vertex { x, y, v });
         }
     }
@@ -359,15 +385,12 @@ impl Plotter {
     pub fn draw(&self) {
         let context = &self.context;
 
-        let canvas: web_sys::HtmlCanvasElement = context
-            .canvas()
-            .unwrap()
-            .dyn_into::<web_sys::HtmlCanvasElement>()
-            .unwrap();
+        let res = 4.;
 
-        let res = 4;
-        let x_len = canvas.width() / res;
-        let y_len = canvas.height() / res;
+        let x_lengths =
+            subdivide_lengths(self.curves[0].cumulative_lengths(), res);
+        let y_lengths =
+            subdivide_lengths(self.curves[1].cumulative_lengths(), res);
 
         let mut mesh = TriangleMesh::new();
 
@@ -375,11 +398,11 @@ impl Plotter {
         let mut max_v = f32::NEG_INFINITY;
 
         // Rebuild vertex data
-        mesh.vertices = build_vertex_data(x_len, y_len, |x, y| {
+        mesh.vertices = build_vertex_data(&x_lengths, &y_lengths, |x, y| {
             let [c1, c2] = &self.curves;
 
-            let p1 = c1.at(x * c1.total_length());
-            let p2 = c2.at(y * c2.total_length());
+            let p1 = c1.at(x);
+            let p2 = c2.at(y);
             let v = p1.dist(&p2);
 
             min_v = min_v.min(v);
@@ -389,7 +412,8 @@ impl Plotter {
         });
 
         // Rebuild index data
-        mesh.indices = build_index_data(x_len, y_len);
+        mesh.indices =
+            build_index_data(x_lengths.len() as u32, y_lengths.len() as u32);
 
         // Build isoline data;
         let isoline_vertex_data = [
