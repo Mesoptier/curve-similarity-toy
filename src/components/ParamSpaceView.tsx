@@ -28,22 +28,21 @@ function makeGridLines(xCoords: number[], yCoords: number[]): string {
 }
 
 export function ParamSpaceView(props: ParamSpaceViewProps): JSX.Element {
+    const { curves, ...otherProps } = props;
     return (
         <div className="space-view">
             <header className="space-view__header">
                 <div className="space-view__title">Parameter space</div>
             </header>
-            <ParamSpaceViewCanvas {...props} />
+            {curves.every((curve) => curve.points.length > 1) && (
+                <ParamSpaceViewCanvas curves={curves} {...otherProps} />
+            )}
         </div>
     );
 }
 
 function ParamSpaceViewCanvas(props: ParamSpaceViewCanvasProps): JSX.Element {
     const { curves, highlightLeash, setHighlightLeash } = props;
-
-    if (curves.some((curve) => curve.points.length <= 1)) {
-        return null;
-    }
 
     const [cumulativeLengths1, cumulativeLengths2] = curves.map(
         (curve) => curve.cumulative_lengths,
