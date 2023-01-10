@@ -10,15 +10,28 @@ function makePathDefinition(curve: JsCurve): string {
     return 'M' + points.map(({ x, y }) => `${x},${y}`).join(' ');
 }
 
-interface CurveSpaceViewProps {
+interface CurveSpaceViewCanvasProps {
     curves: [JsCurve, JsCurve];
     updateCurves: Dispatch<SetStateAction<JsCurve[]>>;
     highlightLeash: [number, number] | null;
 }
 
+type CurveSpaceViewProps = CurveSpaceViewCanvasProps;
+
 type PreviewPoints = [IPoint | null, IPoint | null];
 
 export function CurveSpaceView(props: CurveSpaceViewProps): JSX.Element {
+    return (
+        <div className="space-view">
+            <header className="space-view__header">
+                <div className="space-view__title">Curves space</div>
+            </header>
+            <CurveSpaceViewCanvas {...props} />
+        </div>
+    );
+}
+
+function CurveSpaceViewCanvas(props: CurveSpaceViewCanvasProps): JSX.Element {
     const { curves, updateCurves, highlightLeash } = props;
 
     const [previewPoints, setPreviewPoints] = useState<PreviewPoints>([
@@ -47,7 +60,7 @@ export function CurveSpaceView(props: CurveSpaceViewProps): JSX.Element {
 
     return (
         <svg
-            className="space-view"
+            className="space-view__canvas"
             onClick={(e) => {
                 const curveIdx = e.ctrlKey ? 1 : 0;
                 const newPoint = {

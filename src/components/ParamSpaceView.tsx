@@ -5,11 +5,13 @@ import { Plotter, JsCurve } from '@rs_lib';
 const CURVE_OFFSET = 20;
 const PLOT_OFFSET = 40;
 
-interface ParamSpaceViewProps {
+interface ParamSpaceViewCanvasProps {
     curves: [JsCurve, JsCurve];
     highlightLeash: [number, number] | null;
     setHighlightLeash: Dispatch<SetStateAction<[number, number] | null>>;
 }
+
+type ParamSpaceViewProps = ParamSpaceViewCanvasProps;
 
 function makeGridLines(xCoords: number[], yCoords: number[]): string {
     const verticalLines = xCoords
@@ -26,6 +28,17 @@ function makeGridLines(xCoords: number[], yCoords: number[]): string {
 }
 
 export function ParamSpaceView(props: ParamSpaceViewProps): JSX.Element {
+    return (
+        <div className="space-view">
+            <header className="space-view__header">
+                <div className="space-view__title">Parameter space</div>
+            </header>
+            <ParamSpaceViewCanvas {...props} />
+        </div>
+    );
+}
+
+function ParamSpaceViewCanvas(props: ParamSpaceViewCanvasProps): JSX.Element {
     const { curves, highlightLeash, setHighlightLeash } = props;
 
     if (curves.some((curve) => curve.points.length <= 1)) {
@@ -42,7 +55,7 @@ export function ParamSpaceView(props: ParamSpaceViewProps): JSX.Element {
     const totalHeight = Math.floor(height) + PLOT_OFFSET + CURVE_OFFSET;
 
     return (
-        <svg className="space-view">
+        <svg className="space-view__canvas">
             <g transform={`translate(0, ${totalHeight}) scale(1, -1)`}>
                 {/* Flattened curves along axes */}
                 {[
