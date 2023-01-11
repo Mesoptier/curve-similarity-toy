@@ -8,6 +8,7 @@ out vec4 v_color;
 
 uniform vec4 u_color_map[MAX_COLORS];
 uniform vec2 u_value_range;
+uniform mat4 u_transform;
 
 vec3 color_map_get(float value) {
     // TODO: Pass u_color_map_len as uniform along with u_color_map
@@ -32,5 +33,5 @@ void main() {
         v_color = vec4(color, 1.0);
     }
 
-    gl_Position = a_position;
+    gl_Position = a_position * u_transform;
 }

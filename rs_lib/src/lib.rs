@@ -1,8 +1,7 @@
 use std::iter;
-use std::ops::{Add, Mul};
 use std::str::FromStr;
 
-use itertools::{Itertools, TupleWindows};
+use itertools::Itertools;
 use palette::{Pixel, Srgb};
 use wasm_bindgen::prelude::*;
 use web_sys::{
@@ -12,11 +11,17 @@ use web_sys::{
 
 use crate::geom::curve::Curve;
 use crate::geom::{Dist, JsCurve};
+use crate::plot::element_mesh::{ElementMesh, Vertex};
 use crate::traits::mix::Mix;
 use crate::traits::vec_ext::VecExt;
 
 mod geom;
+mod plot;
 mod traits;
+
+macro_rules! console_log {
+    ($($t:tt)*) => (web_sys::console::log_1(&format!($($t)*).into()))
+}
 
 const BYTES_PER_FLOAT: i32 = 4;
 
@@ -24,119 +29,32 @@ const FLOATS_PER_POSITION: i32 = 2;
 const FLOATS_PER_VALUE: i32 = 1;
 const FLOATS_PER_VERTEX: i32 = FLOATS_PER_POSITION + FLOATS_PER_VALUE;
 
-#[derive(Clone, Copy, Debug)]
-#[repr(C)]
-struct Vertex {
-    x: f32,
-    y: f32,
-    v: f32,
-}
-
-impl Add for Vertex {
-    type Output = Self;
-
-    fn add(self, rhs: Self) -> Self::Output {
-        Vertex {
-            x: self.x + rhs.x,
-            y: self.y + rhs.y,
-            v: self.v + rhs.v,
-        }
-    }
-}
-
-impl Mul<f32> for Vertex {
-    type Output = Self;
-
-    fn mul(self, rhs: f32) -> Self::Output {
-        Vertex {
-            x: self.x * rhs,
-            y: self.y * rhs,
-            v: self.v * rhs,
-        }
-    }
-}
-
-// TODO: Should this contain references to vertices, or just copies of the vertices?
-#[derive(Debug)]
-struct Triangle<'a>(&'a Vertex, &'a Vertex, &'a Vertex);
-
-struct TriangleStripIter<'a, I>
-where
-    I: Iterator<Item = &'a u32>,
-{
-    vertices: &'a Vec<Vertex>,
-    indices_iter: TupleWindows<I, (&'a u32, &'a u32, &'a u32)>,
-}
-
-impl<'a, I> TriangleStripIter<'a, I>
-where
-    I: Iterator<Item = &'a u32>,
-{
-    fn new(vertices: &'a Vec<Vertex>, indices: I) -> Self {
-        Self {
-            vertices,
-            indices_iter: indices.tuple_windows(),
-        }
-    }
-}
-
-impl<'a, I> Iterator for TriangleStripIter<'a, I>
-where
-    I: Iterator<Item = &'a u32>,
-{
-    type Item = Triangle<'a>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        // TODO: Make this actually iterate like WebGL's triangle strip
-        self.indices_iter.next().map(|(i1, i2, i3)| {
-            Triangle(
-                &self.vertices[*i1 as usize],
-                &self.vertices[*i2 as usize],
-                &self.vertices[*i3 as usize],
-            )
-        })
-    }
-}
-
-struct TriangleMesh {
-    vertices: Vec<Vertex>,
-    indices: Vec<u32>,
-}
-
-impl TriangleMesh {
-    fn new() -> Self {
-        Self {
-            vertices: vec![],
-            indices: vec![],
-        }
-    }
-
-    fn iter_triangles(
-        &self,
-    ) -> TriangleStripIter<'_, std::slice::Iter<'_, u32>> {
-        TriangleStripIter::new(&self.vertices, self.indices.iter())
-    }
-}
-
-fn make_isolines(mesh: &TriangleMesh, threshold: f32) -> Vec<Vertex> {
+fn make_isolines(
+    mesh: &ElementMesh<Dist>,
+    threshold: Dist,
+) -> Vec<Vertex<Dist>> {
     let mut isoline_vertices = vec![];
 
-    fn get_t(min: f32, max: f32, x: f32) -> f32 {
+    fn get_t(min: Dist, max: Dist, x: Dist) -> Dist {
         if min > max {
             return 1.0 - get_t(max, min, x);
         }
         (x - min) / (max - min)
     }
 
-    let mut push_edge = |v1: Vertex, v2: Vertex| {
-        let t = get_t(v1.v, v2.v, threshold);
-        isoline_vertices.push(v1.mix(v2, t));
+    let mut push_edge = |v1: &Vertex<Dist>, v2: &Vertex<Dist>| {
+        let t = get_t(v1.value, v2.value, threshold);
+        isoline_vertices.push(v1.mix(*v2, t));
     };
 
     for triangle in mesh.iter_triangles() {
-        let Triangle(&v0, &v1, &v2) = triangle;
+        let [v0, v1, v2] = triangle;
 
-        match (v0.v > threshold, v1.v > threshold, v2.v > threshold) {
+        match (
+            v0.value > threshold,
+            v1.value > threshold,
+            v2.value > threshold,
+        ) {
             (true, true, true) | (false, false, false) => {}
             (true, true, false) | (false, false, true) => {
                 push_edge(v0, v2);
@@ -179,65 +97,6 @@ fn subdivide_lengths(lengths: &Vec<Dist>, res: Dist) -> Vec<Dist> {
         .collect()
 }
 
-/// Builds the lattice of vertices used by the triangle mesh.
-fn build_vertex_data<F>(
-    x_lengths: &Vec<Dist>,
-    y_lengths: &Vec<Dist>,
-    mut f: F,
-) -> Vec<Vertex>
-where
-    F: FnMut(Dist, Dist) -> Dist,
-{
-    let vertex_data_len = (x_lengths.len() * y_lengths.len()) as usize;
-    let mut vertex_data: Vec<Vertex> = Vec::with_capacity(vertex_data_len);
-
-    let max_x_length = *x_lengths.last().unwrap();
-    let max_y_length = *y_lengths.last().unwrap();
-
-    for y_length in y_lengths {
-        for x_length in x_lengths {
-            let v = f(*x_length, *y_length);
-
-            // Scale coords to [-1, 1]
-            let x = (x_length / max_x_length) * 2.0 - 1.0;
-            let y = (y_length / max_y_length) * 2.0 - 1.0;
-            vertex_data.push(Vertex { x, y, v });
-        }
-    }
-
-    assert_eq!(vertex_data.len(), vertex_data_len);
-
-    vertex_data
-}
-
-/// Builds the list of indices (of vertices in the mesh) to be interpreted as a triangle strip by
-/// WebGL.
-fn build_index_data(x_len: u32, y_len: u32) -> Vec<u32> {
-    let index_data_len = 2 * (x_len * (y_len - 1) + (y_len - 2)) as usize;
-    let mut index_data: Vec<u32> = Vec::with_capacity(index_data_len);
-
-    for y in 0..(y_len - 1) {
-        if y > 0 {
-            // Degenerate begin: repeat first vertex
-            index_data.push(y * x_len);
-        }
-
-        for x in 0..x_len {
-            index_data.push((y * x_len) + x);
-            index_data.push(((y + 1) * x_len) + x);
-        }
-
-        if y < y_len - 2 {
-            // Degenerate end: repeat last vertex
-            index_data.push(((y + 1) * x_len) + (x_len - 1));
-        }
-    }
-
-    assert_eq!(index_data.len(), index_data_len);
-
-    index_data
-}
-
 #[wasm_bindgen(getter_with_clone)]
 pub struct Plotter {
     context: WebGl2RenderingContext,
@@ -245,6 +104,7 @@ pub struct Plotter {
 
     color_map_uniform: WebGlUniformLocation,
     value_range_uniform: WebGlUniformLocation,
+    transform_uniform: WebGlUniformLocation,
 
     vertex_buffer: WebGlBuffer,
     index_buffer: WebGlBuffer,
@@ -281,11 +141,15 @@ impl Plotter {
             context.get_attrib_location(&program, "a_position") as u32;
         let value_attribute =
             context.get_attrib_location(&program, "a_value") as u32;
+
         let color_map_uniform = context
             .get_uniform_location(&program, "u_color_map")
             .unwrap();
         let value_range_uniform = context
             .get_uniform_location(&program, "u_value_range")
+            .unwrap();
+        let transform_uniform = context
+            .get_uniform_location(&program, "u_transform")
             .unwrap();
 
         // Init: create buffers
@@ -372,6 +236,7 @@ impl Plotter {
 
             color_map_uniform,
             value_range_uniform,
+            transform_uniform,
 
             vertex_buffer,
             index_buffer,
@@ -385,44 +250,39 @@ impl Plotter {
     pub fn draw(&self) {
         let context = &self.context;
 
-        let res = 4.;
-
-        let x_lengths =
+        // Build mesh
+        let res = 16.;
+        let x_points =
             subdivide_lengths(self.curves[0].cumulative_lengths(), res);
-        let y_lengths =
+        let y_points =
             subdivide_lengths(self.curves[1].cumulative_lengths(), res);
-
-        let mut mesh = TriangleMesh::new();
 
         let mut min_v = f32::INFINITY;
         let mut max_v = f32::NEG_INFINITY;
 
-        // Rebuild vertex data
-        mesh.vertices = build_vertex_data(&x_lengths, &y_lengths, |x, y| {
-            let [c1, c2] = &self.curves;
+        let element_mesh =
+            ElementMesh::from_points((&x_points, &y_points), |&p| {
+                let [c1, c2] = &self.curves;
 
-            let p1 = c1.at(x);
-            let p2 = c2.at(y);
-            let v = p1.dist(&p2);
+                let p1 = c1.at(p.x);
+                let p2 = c2.at(p.y);
+                let v = p1.dist(&p2);
 
-            min_v = min_v.min(v);
-            max_v = max_v.max(v);
+                // TODO: Should these just be properties on ElementMesh?
+                min_v = min_v.min(v);
+                max_v = max_v.max(v);
 
-            v
-        });
+                v
+            });
 
-        // Rebuild index data
-        mesh.indices =
-            build_index_data(x_lengths.len() as u32, y_lengths.len() as u32);
-
-        // Build isoline data;
+        // Build isoline data
         let isoline_vertex_data = [
             min_v + (max_v - min_v) * 0.25,
             min_v + (max_v - min_v) * 0.50,
             min_v + (max_v - min_v) * 0.75,
         ]
         .into_iter()
-        .flat_map(|threshold| make_isolines(&mesh, threshold))
+        .flat_map(|threshold| make_isolines(&element_mesh, threshold))
         .collect();
 
         fn upload_buffer_data<T>(
@@ -448,11 +308,19 @@ impl Plotter {
             }
         }
 
+        let vertex_data = element_mesh.vertices();
+        let index_data = &element_mesh
+            .triangle_elements()
+            .iter()
+            .flatten()
+            .map(|&idx| idx as u32)
+            .collect_vec();
+
         // Upload updated vertex data
         upload_buffer_data(
             &self.context,
             &self.vertex_buffer,
-            &mesh.vertices,
+            vertex_data,
             WebGl2RenderingContext::ARRAY_BUFFER,
             WebGl2RenderingContext::STATIC_DRAW,
         );
@@ -461,7 +329,7 @@ impl Plotter {
         upload_buffer_data(
             &self.context,
             &self.index_buffer,
-            &mesh.indices,
+            index_data,
             WebGl2RenderingContext::ELEMENT_ARRAY_BUFFER,
             WebGl2RenderingContext::STATIC_DRAW,
         );
@@ -478,6 +346,24 @@ impl Plotter {
         // Upload min/max values range
         self.context
             .uniform2f(Some(&self.value_range_uniform), min_v, max_v);
+
+        // Upload transformation matrix
+        let max_x = self.curves[0].total_length();
+        let max_y = self.curves[1].total_length();
+
+        #[rustfmt::skip]
+        let transform: [f32; 16] = [
+            2.0 / max_x, 0.0, 0.0, -1.0,
+            0.0, 2.0 / max_y, 0.0, -1.0,
+            0.0, 0.0, 1.0, 0.0,
+            0.0, 0.0, 0.0, 1.0,
+        ];
+
+        self.context.uniform_matrix4fv_with_f32_array(
+            Some(&self.transform_uniform),
+            false,
+            &transform,
+        );
 
         // TODO: Get gradient from CSS custom property, so it can change according to `prefers-color-scheme` media query
         // Colors generated using https://www.learnui.design/tools/gradient-generator.html
@@ -506,8 +392,8 @@ impl Plotter {
 
         context.bind_vertex_array(Some(&self.vao_triangles));
         context.draw_elements_with_i32(
-            WebGl2RenderingContext::TRIANGLE_STRIP,
-            mesh.indices.len() as i32,
+            WebGl2RenderingContext::TRIANGLES,
+            index_data.len() as i32,
             WebGl2RenderingContext::UNSIGNED_INT,
             0,
         );

@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 use std::ops::{Add, Mul};
 
 #[derive(Serialize, Deserialize, Copy, Clone, Debug, Default, PartialEq)]
+#[repr(C)]
 pub struct Point {
     pub x: Dist,
     pub y: Dist,
@@ -13,6 +14,18 @@ impl Point {
     /// Computes Euclidean distance between the two points.
     pub fn dist(&self, other: &Point) -> Dist {
         ((self.x - other.x).powi(2) + (self.y - other.y).powi(2)).sqrt()
+    }
+}
+
+impl From<(Dist, Dist)> for Point {
+    fn from((x, y): (Dist, Dist)) -> Self {
+        Self { x, y }
+    }
+}
+
+impl From<Point> for (Dist, Dist) {
+    fn from(p: Point) -> Self {
+        (p.x, p.y)
     }
 }
 
