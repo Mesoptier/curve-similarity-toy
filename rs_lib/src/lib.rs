@@ -10,6 +10,7 @@ use web_sys::{
 };
 
 use crate::geom::curve::Curve;
+use crate::geom::point::Point;
 use crate::geom::{Dist, JsCurve};
 use crate::plot::element_mesh::{ElementMesh, Vertex};
 use crate::traits::mix::Mix;
@@ -47,7 +48,7 @@ fn make_isolines(
         isoline_vertices.push(v1.mix(*v2, t));
     };
 
-    for triangle in mesh.iter_triangles() {
+    for triangle in mesh.iter_triangle_vertices() {
         let [v0, v1, v2] = triangle;
 
         match (
@@ -260,20 +261,32 @@ impl Plotter {
         let mut min_v = f32::INFINITY;
         let mut max_v = f32::NEG_INFINITY;
 
-        let element_mesh =
-            ElementMesh::from_points((&x_points, &y_points), |&p| {
-                let [c1, c2] = &self.curves;
+        let value_at_point = |&point: &Point| -> Dist {
+            let [c1, c2] = &self.curves;
 
-                let p1 = c1.at(p.x);
-                let p2 = c2.at(p.y);
-                let v = p1.dist(&p2);
+            let p1 = c1.at(point.x);
+            let p2 = c2.at(point.y);
+            p1.dist(&p2)
+        };
+
+        let element_mesh =
+            ElementMesh::from_points((&x_points, &y_points), |point| {
+                let value = value_at_point(point);
 
                 // TODO: Should these just be properties on ElementMesh?
-                min_v = min_v.min(v);
-                max_v = max_v.max(v);
+                min_v = min_v.min(value);
+                max_v = max_v.max(value);
 
-                v
+                value
             });
+
+        let should_refine_edge = |edge: [&Vertex<Dist>; 2]| -> bool {
+            let [left, right] = edge;
+            let mid_lerp = left.value.mix(right.value, 0.5);
+            let mid_eval = value_at_point(&left.point.mix(right.point, 0.5));
+            let error = (mid_lerp - mid_eval).abs();
+            error > 0.1
+        };
 
         // Build isoline data
         let isoline_vertex_data = [
@@ -310,10 +323,9 @@ impl Plotter {
 
         let vertex_data = element_mesh.vertices();
         let index_data = &element_mesh
-            .triangle_elements()
-            .iter()
+            .iter_triangle_elements()
             .flatten()
-            .map(|&idx| idx as u32)
+            .map(|idx| idx as u32)
             .collect_vec();
 
         // Upload updated vertex data
