@@ -213,6 +213,7 @@ impl<Value> ElementMesh<Value> {
             (0..self.triangles.len()).map(|triangle_idx| (triangle_idx, 0)),
         );
 
+        let min_degree = 1;
         let max_degree = 10;
 
         while let Some((triangle_idx, degree)) = queue.pop_front() {
@@ -222,11 +223,13 @@ impl<Value> ElementMesh<Value> {
             if self.triangles[triangle_idx].degree != degree {
                 continue;
             }
-            if !should_refine_edge(
-                self.triangles[triangle_idx]
-                    .edge(0)
-                    .map(|vertex_idx| &self.vertices[vertex_idx]),
-            ) {
+            if degree >= min_degree
+                && !should_refine_edge(
+                    self.triangles[triangle_idx]
+                        .edge(0)
+                        .map(|vertex_idx| &self.vertices[vertex_idx]),
+                )
+            {
                 continue;
             }
 

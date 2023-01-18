@@ -7,6 +7,13 @@
     --space-view-box-shadow: inset 0 1px 1px #{rgba(#9ec089, 0.1)},
         inset 0 0 0 1px #{rgba(#9ec089, 0.2)};
 
+    --tool-bg-color: #1f271b;
+    --tool-border-color: var(--tool-bg-color);
+    --tool-bg-color-hover: #{mix(#f3fcf0, #1f271b, 7%)};
+    --tool-border-color-hover: #{rgba(white, 0.1)};
+    --tool-bg-color-active: #{mix(#f3fcf0, #1f271b, 10%)};
+    --tool-border-color-active: #{rgba(white, 0.1)};
+
     --leash-color: #ffd23f;
     --grid-color: #ffffff;
 }
@@ -27,6 +34,13 @@
         --space-view-border-color: #{rgba(#181e15, 0.15)};
         --space-view-box-shadow: 0 2px 3px #{rgba(#181e15, 0.05)},
             inset 0 0 0 1px #{rgba(#181e15, 0.15)};
+
+        --tool-bg-color: #f8fff5;
+        --tool-border-color: var(--tool-bg-color);
+        --tool-bg-color-hover: #{mix(#181e15, #f8fff5, 7%)};
+        --tool-border-color-hover: #{rgba(#181e15, 0.1)};
+        --tool-bg-color-active: #{mix(#181e15, #f8fff5, 10%)};
+        --tool-border-color-active: #{rgba(#181e15, 0.1)};
 
         --leash-color: #09e85e;
         --grid-color: #111;
@@ -55,8 +69,13 @@ body,
 }
 
 html {
+    font-size: 16px;
     font-family: 'Work Sans', sans-serif;
     color-scheme: dark;
+
+    @media (prefers-color-scheme: light) {
+        color-scheme: light;
+    }
 }
 
 body {
@@ -89,14 +108,49 @@ body {
 }
 
 .space-view__header {
+    display: flex;
+    flex-direction: row;
+    gap: 10px;
+
     margin: 0 10px;
     padding: 10px 5px;
     border-bottom: 1px solid var(--space-view-border-color);
 }
 
 .space-view__title {
+    margin-right: auto;
+
     font-weight: 500;
     opacity: 1;
+}
+
+.space-view__tool {
+    display: flex;
+    align-items: center;
+
+    gap: 5px;
+    margin: -5px;
+    padding: 0 8px;
+
+    input[type='checkbox'] {
+        margin: 0;
+    }
+
+    font-size: 14px;
+
+    background-color: var(--tool-bg-color);
+    border: 1px solid var(--tool-border-color);
+    border-radius: 3px;
+
+    &:hover {
+        background-color: var(--tool-bg-color-hover);
+        border-color: var(--tool-border-color-hover);
+    }
+
+    &:active {
+        background-color: var(--tool-bg-color-active);
+        border-color: var(--tool-border-color-active);
+    }
 }
 
 .space-view__canvas {

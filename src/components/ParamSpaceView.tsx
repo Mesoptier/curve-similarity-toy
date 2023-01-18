@@ -7,6 +7,7 @@ const PLOT_OFFSET = 40;
 
 interface ParamSpaceViewCanvasProps {
     containerSize: { width: number; height: number };
+    showMesh: boolean;
 
     curves: [JsCurve, JsCurve];
     highlightLeash: [number, number] | null;
@@ -35,6 +36,8 @@ function makeGridLines(xCoords: number[], yCoords: number[]): string {
 export function ParamSpaceView(props: ParamSpaceViewProps): JSX.Element {
     const { curves, ...otherProps } = props;
 
+    const [showMesh, setShowMesh] = useState(false);
+
     const [container, setContainer] = useState<HTMLElement | null>(null);
     const [containerSize, setContainerSize] = useState<{
         width: number;
@@ -60,12 +63,21 @@ export function ParamSpaceView(props: ParamSpaceViewProps): JSX.Element {
         <div className="space-view">
             <header className="space-view__header">
                 <div className="space-view__title">Parameter space</div>
+                <label className="space-view__tool">
+                    <input
+                        type="checkbox"
+                        checked={showMesh}
+                        onChange={(e) => setShowMesh(e.target.checked)}
+                    />
+                    Show mesh
+                </label>
             </header>
             <div ref={setContainer} className="space-view__canvas">
                 {curves.every((curve) => curve.points.length > 1) && (
                     <ParamSpaceViewCanvas
                         containerSize={containerSize}
                         curves={curves}
+                        showMesh={showMesh}
                         {...otherProps}
                     />
                 )}
@@ -75,7 +87,13 @@ export function ParamSpaceView(props: ParamSpaceViewProps): JSX.Element {
 }
 
 function ParamSpaceViewCanvas(props: ParamSpaceViewCanvasProps): JSX.Element {
-    const { containerSize, curves, highlightLeash, setHighlightLeash } = props;
+    const {
+        containerSize,
+        showMesh,
+        curves,
+        highlightLeash,
+        setHighlightLeash,
+    } = props;
 
     const [cumulativeLengths1, cumulativeLengths2] = curves.map(
         (curve) => curve.cumulative_lengths,
@@ -144,6 +162,7 @@ function ParamSpaceViewCanvas(props: ParamSpaceViewCanvasProps): JSX.Element {
                         curves={curves}
                         width={Math.round(plotWidth)}
                         height={Math.round(plotHeight)}
+                        showMesh={showMesh}
                     />
                 </foreignObject>
 
@@ -202,10 +221,11 @@ interface PlotProps {
     curves: [JsCurve, JsCurve];
     width: number;
     height: number;
+    showMesh: boolean;
 }
 
 function Plot(props: PlotProps): JSX.Element {
-    const { curves, height, width } = props;
+    const { curves, height, width, showMesh } = props;
 
     const [canvas, setCanvas] = useState<HTMLCanvasElement | null>(null);
     const [plotter, setPlotter] = useState<Plotter | null>(null);
@@ -226,8 +246,8 @@ function Plot(props: PlotProps): JSX.Element {
 
         plotter.update_curves(...curves);
         plotter.resize(width, height);
-        plotter.draw();
-    }, [plotter, curves, width, height]);
+        plotter.draw(showMesh);
+    }, [plotter, curves, width, height, showMesh]);
 
     return (
         <canvas

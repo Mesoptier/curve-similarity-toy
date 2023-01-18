@@ -249,11 +249,11 @@ impl Plotter {
         })
     }
 
-    pub fn draw(&self) {
+    pub fn draw(&self, show_mesh: bool) {
         let context = &self.context;
 
         // Build mesh
-        let res = 32.;
+        let res = 64.;
         let x_points =
             subdivide_lengths(self.curves[0].cumulative_lengths(), res);
         let y_points =
@@ -291,10 +291,8 @@ impl Plotter {
 
         element_mesh.refine(&value_at_point, should_refine_edge);
 
-        // TODO: Render mesh outlines for debugging
-
         // Build isoline data
-        let isoline_vertex_data = [
+        let mut isoline_vertex_data: Vec<Vertex<Dist>> = [
             min_v + (max_v - min_v) * 0.25,
             min_v + (max_v - min_v) * 0.50,
             min_v + (max_v - min_v) * 0.75,
@@ -302,6 +300,15 @@ impl Plotter {
         .into_iter()
         .flat_map(|threshold| make_isolines(&element_mesh, threshold))
         .collect();
+
+        if show_mesh {
+            isoline_vertex_data.extend(
+                element_mesh
+                    .iter_triangle_vertices()
+                    .flat_map(|[v1, v2, v3]| [v1, v2, v2, v3, v3, v1])
+                    .copied(),
+            );
+        }
 
         fn upload_buffer_data<T>(
             context: &WebGl2RenderingContext,
