@@ -20,6 +20,7 @@ mod geom;
 mod plot;
 mod traits;
 
+#[macro_export]
 macro_rules! console_log {
     ($($t:tt)*) => (web_sys::console::log_1(&format!($($t)*).into()))
 }
@@ -252,7 +253,7 @@ impl Plotter {
         let context = &self.context;
 
         // Build mesh
-        let res = 16.;
+        let res = 32.;
         let x_points =
             subdivide_lengths(self.curves[0].cumulative_lengths(), res);
         let y_points =
@@ -269,7 +270,7 @@ impl Plotter {
             p1.dist(&p2)
         };
 
-        let element_mesh =
+        let mut element_mesh =
             ElementMesh::from_points((&x_points, &y_points), |point| {
                 let value = value_at_point(point);
 
@@ -287,6 +288,10 @@ impl Plotter {
             let error = (mid_lerp - mid_eval).abs();
             error > 0.1
         };
+
+        element_mesh.refine(&value_at_point, should_refine_edge);
+
+        // TODO: Render mesh outlines for debugging
 
         // Build isoline data
         let isoline_vertex_data = [

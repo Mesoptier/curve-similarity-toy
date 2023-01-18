@@ -1,6 +1,8 @@
 use itertools::Itertools;
+use std::collections::VecDeque;
 
 use crate::{
+    console_log,
     geom::{point::Point, Dist},
     traits::mix::Mix,
 };
@@ -28,12 +30,15 @@ where
     }
 }
 
-/// Isosceles triangle, with corner elements in clockwise order, with base first.
+/// Triangle, with corner elements in clockwise order, with base first.
+#[derive(Copy, Clone, Debug)]
 struct Triangle {
     elements: [usize; 3],
     /// Map from edge index to connected edge (as `Some((triangle_idx, edge_idx))`) or `None` if the
     /// edge is on the mesh boundary.
     connectivity: [Option<(usize, usize)>; 3],
+    /// Triangle degree (i.e. how many times it has been refined)
+    degree: usize,
 }
 
 impl Triangle {
@@ -143,6 +148,7 @@ impl<Value> ElementMesh<Value> {
                 |elements: [usize; 3], triangle_idx: usize| Triangle {
                     elements,
                     connectivity: compute_connectivity(triangle_idx, elements),
+                    degree: 0,
                 };
 
             [
@@ -195,6 +201,151 @@ impl<Value> ElementMesh<Value> {
             vertices,
             triangles,
         }
+    }
+
+    // TODO: Refactor this whole mess
+    pub fn refine(
+        &mut self,
+        value_at_point: &impl Fn(&Point) -> Value,
+        should_refine_edge: impl Fn([&Vertex<Value>; 2]) -> bool,
+    ) {
+        let mut queue = VecDeque::from_iter(
+            (0..self.triangles.len()).map(|triangle_idx| (triangle_idx, 0)),
+        );
+
+        let max_degree = 10;
+
+        while let Some((triangle_idx, degree)) = queue.pop_front() {
+            if degree > max_degree {
+                continue;
+            }
+            if self.triangles[triangle_idx].degree != degree {
+                continue;
+            }
+            if !should_refine_edge(
+                self.triangles[triangle_idx]
+                    .edge(0)
+                    .map(|vertex_idx| &self.vertices[vertex_idx]),
+            ) {
+                continue;
+            }
+
+            let [t1, t2] =
+                self.refine_triangle_base(triangle_idx, value_at_point);
+
+            queue.push_back((t1, degree + 1));
+            queue.push_back((t2, degree + 1));
+        }
+    }
+
+    fn refine_triangle_base(
+        &mut self,
+        triangle_idx: usize,
+        value_at_point: &impl Fn(&Point) -> Value,
+    ) -> [usize; 2] {
+        let triangle = self.triangles[triangle_idx];
+
+        let edge = triangle
+            .edge(0)
+            .map(|vertex_idx| &self.vertices[vertex_idx]);
+
+        let mid_point = edge[0].point.mix(edge[1].point, 0.5);
+        let mid_value = value_at_point(&mid_point);
+
+        let other_triangle_idx = triangle.connectivity[0].map(
+            |(other_triangle_idx, other_edge_idx)| {
+                if other_edge_idx == 0 {
+                    other_triangle_idx
+                } else {
+                    // Subdivide the connected triangle and return the index of the new triangle
+                    // that's now connected at the base
+                    self.refine_triangle_base(
+                        other_triangle_idx,
+                        value_at_point,
+                    )[other_edge_idx - 1]
+                }
+            },
+        );
+
+        assert!(other_triangle_idx
+            .map(|idx| self.triangles[idx].degree == triangle.degree)
+            .unwrap_or(true));
+
+        let new_vertex_idx = self.vertices.len();
+        self.vertices.push(Vertex {
+            point: mid_point,
+            value: mid_value,
+        });
+
+        let mut foo = |triangle_idx: usize| {
+            //       2                    2
+            //      ╱ ╲                  ╱|╲
+            //    ╱     ╲      ->      ╱  |  ╲
+            //  ╱    T    ╲          ╱  T | T' ╲
+            // 1 --------- 0        1 --- m --- 0
+
+            let triangle = self.triangles[triangle_idx];
+            let new_triangle_idx = self.triangles.len();
+
+            self.triangles[triangle_idx] = Triangle {
+                elements: [
+                    triangle.elements[1],
+                    triangle.elements[2],
+                    new_vertex_idx,
+                ],
+                connectivity: [
+                    triangle.connectivity[1],
+                    Some((new_triangle_idx, 2)),
+                    None, // Connected later
+                ],
+                degree: triangle.degree + 1,
+            };
+
+            self.triangles.push(Triangle {
+                elements: [
+                    triangle.elements[2],
+                    triangle.elements[0],
+                    new_vertex_idx,
+                ],
+                connectivity: [
+                    triangle.connectivity[2],
+                    None, // Connected later
+                    Some((triangle_idx, 1)),
+                ],
+                degree: triangle.degree + 1,
+            });
+
+            // Fix connectivity
+            for triangle_idx in [triangle_idx, new_triangle_idx] {
+                if let Some((t, e)) =
+                    self.triangles[triangle_idx].connectivity[0]
+                {
+                    self.triangles[t].connectivity[e] = Some((triangle_idx, 0));
+                }
+            }
+
+            [(triangle_idx, 2), (new_triangle_idx, 1)]
+        };
+
+        let [edge_1, edge_2] = foo(triangle_idx);
+
+        if let Some([other_edge_1, other_edge_2]) = other_triangle_idx.map(foo)
+        {
+            let mut connect_edges = |e1: (usize, usize), e2: (usize, usize)| {
+                assert_eq!(
+                    self.triangles[e1.0].edge(e1.1),
+                    self.triangles[e2.0].edge_reverse(e2.1)
+                );
+
+                self.triangles[e1.0].connectivity[e1.1] = Some(e2);
+                self.triangles[e2.0].connectivity[e2.1] = Some(e1);
+            };
+
+            connect_edges(edge_1, other_edge_2);
+            connect_edges(edge_2, other_edge_1);
+        }
+
+        [edge_1.0, edge_2.0]
     }
 
     pub fn iter_triangle_elements(
