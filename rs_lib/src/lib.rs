@@ -289,17 +289,30 @@ impl Plotter {
             error > 0.1
         };
 
-        element_mesh.refine(&value_at_point, should_refine_edge);
+        let should_refine_triangle = |triangle: [&Vertex<Dist>; 3]| -> bool {
+            let [v1, v2, v3] = triangle;
+            let mid_point = (v1.point + v2.point + v3.point) * (1. / 3.);
+            let mid_value_lerp = (v1.value + v2.value + v3.value) * (1. / 3.);
+            let mid_value_eval = value_at_point(&mid_point);
+            let error = (mid_value_lerp - mid_value_eval).abs();
+            error > 0.1
+        };
+
+        element_mesh.refine(
+            &value_at_point,
+            should_refine_edge,
+            should_refine_triangle,
+        );
 
         // Build isoline data
-        let mut isoline_vertex_data: Vec<Vertex<Dist>> = [
-            min_v + (max_v - min_v) * 0.25,
-            min_v + (max_v - min_v) * 0.50,
-            min_v + (max_v - min_v) * 0.75,
-        ]
-        .into_iter()
-        .flat_map(|threshold| make_isolines(&element_mesh, threshold))
-        .collect();
+        let num_isolines = 10;
+        let mut isoline_vertex_data: Vec<Vertex<Dist>> = (0..num_isolines)
+            .map(|w_idx| {
+                1. / ((num_isolines + 1) as Dist) * ((w_idx + 1) as Dist)
+            })
+            .map(|w| min_v + (max_v - min_v) * w)
+            .flat_map(|threshold| make_isolines(&element_mesh, threshold))
+            .collect();
 
         if show_mesh {
             isoline_vertex_data.extend(

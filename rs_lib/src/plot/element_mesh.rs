@@ -216,6 +216,7 @@ impl<Value> ElementMesh<Value> {
         &mut self,
         value_at_point: &impl Fn(&Point) -> Value,
         should_refine_edge: impl Fn([&Vertex<Value>; 2]) -> bool,
+        should_refine_triangle: impl Fn([&Vertex<Value>; 3]) -> bool,
     ) {
         #[derive(Debug)]
         struct Entry {
@@ -250,6 +251,11 @@ impl<Value> ElementMesh<Value> {
                 && !should_refine_edge(
                     self.triangles[entry.triangle_idx]
                         .edge(entry.edge_idx)
+                        .map(|vertex_idx| &self.vertices[vertex_idx]),
+                )
+                && !should_refine_triangle(
+                    self.triangles[entry.triangle_idx]
+                        .elements
                         .map(|vertex_idx| &self.vertices[vertex_idx]),
                 )
             {
