@@ -31,18 +31,18 @@ const FLOATS_PER_POSITION: i32 = 2;
 const FLOATS_PER_VALUE: i32 = 1;
 const FLOATS_PER_VERTEX: i32 = FLOATS_PER_POSITION + FLOATS_PER_VALUE;
 
+fn get_t(min: Dist, max: Dist, x: Dist) -> Dist {
+    if min > max {
+        return 1.0 - get_t(max, min, x);
+    }
+    (x - min) / (max - min)
+}
+
 fn make_isolines(
     mesh: &ElementMesh<Dist>,
     threshold: Dist,
 ) -> Vec<Vertex<Dist>> {
     let mut isoline_vertices = vec![];
-
-    fn get_t(min: Dist, max: Dist, x: Dist) -> Dist {
-        if min > max {
-            return 1.0 - get_t(max, min, x);
-        }
-        (x - min) / (max - min)
-    }
 
     let mut push_edge = |v1: &Vertex<Dist>, v2: &Vertex<Dist>| {
         let t = get_t(v1.value, v2.value, threshold);
@@ -281,12 +281,37 @@ impl Plotter {
                 value
             });
 
+        let num_isolines = 10;
+        let isoline_thresholds = (0..num_isolines)
+            .map(|w_idx| {
+                1. / ((num_isolines + 1) as Dist) * ((w_idx + 1) as Dist)
+            })
+            .map(|w| min_v + (max_v - min_v) * w)
+            .collect_vec();
+
         let should_refine_edge = |edge: [&Vertex<Dist>; 2]| -> bool {
             let [left, right] = edge;
-            let mid_lerp = left.value.mix(right.value, 0.5);
-            let mid_eval = value_at_point(&left.point.mix(right.point, 0.5));
-            let error = (mid_lerp - mid_eval).abs();
-            error > 0.1
+
+            let min_value = left.value.min(right.value);
+            let max_value = left.value.max(right.value);
+
+            for &threshold_value in &isoline_thresholds {
+                if threshold_value < min_value || max_value < threshold_value {
+                    continue;
+                }
+
+                let t = get_t(min_value, max_value, threshold_value);
+
+                let evaluated_value =
+                    value_at_point(&left.point.mix(right.point, t));
+                let error = (threshold_value - evaluated_value).abs();
+
+                if error > 0.1 {
+                    return true;
+                }
+            }
+
+            false
         };
 
         let should_refine_triangle = |triangle: [&Vertex<Dist>; 3]| -> bool {
@@ -305,12 +330,8 @@ impl Plotter {
         );
 
         // Build isoline data
-        let num_isolines = 10;
-        let mut isoline_vertex_data: Vec<Vertex<Dist>> = (0..num_isolines)
-            .map(|w_idx| {
-                1. / ((num_isolines + 1) as Dist) * ((w_idx + 1) as Dist)
-            })
-            .map(|w| min_v + (max_v - min_v) * w)
+        let mut isoline_vertex_data: Vec<Vertex<Dist>> = isoline_thresholds
+            .into_iter()
             .flat_map(|threshold| make_isolines(&element_mesh, threshold))
             .collect();
 
