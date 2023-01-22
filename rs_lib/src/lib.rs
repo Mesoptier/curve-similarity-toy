@@ -10,13 +10,12 @@ use web_sys::{
 };
 
 use crate::geom::curve::Curve;
-use crate::geom::point::Point;
 use crate::geom::{Dist, JsCurve};
 use crate::plot::curve_dist_fn::CurveDistFn;
 use crate::plot::element_mesh::{ElementMesh, Vertex};
 use crate::plot::isolines;
 use crate::plot::isolines::BuildIsolines;
-use crate::traits::mix::{InverseMix, Mix};
+use crate::traits::mix::Mix;
 use crate::traits::vec_ext::VecExt;
 
 mod geom;
@@ -225,7 +224,7 @@ impl Plotter {
 
         let mut element_mesh =
             ElementMesh::from_points((&x_points, &y_points), |point| {
-                let value = curve_dist_fn.eval(point);
+                let value = curve_dist_fn.eval(*point);
 
                 // TODO: Should these just be properties on ElementMesh?
                 min_v = min_v.min(value);
@@ -246,13 +245,14 @@ impl Plotter {
             isoline_thresholds.iter().any(|&threshold_value| {
                 isolines::analyze_triangle(triangle, threshold_value)
                     .map(|[v0, v1]| {
-                        // TODO: Base max_error on (estimated) gradient at the isoline
-                        let max_error = 0.1;
-
                         let should_refine_vertex = |v: Vertex<Dist>| {
-                            let true_value = curve_dist_fn.eval(&v.point);
+                            let grad =
+                                curve_dist_fn.eval_gradient_magnitude(v.point);
+                            let true_value = curve_dist_fn.eval(v.point);
                             let error = (v.value - true_value).abs();
-                            error > max_error
+
+                            // TODO: Does this actually make sense?
+                            error > 0.05 * grad
                         };
 
                         should_refine_vertex(v0)
@@ -263,7 +263,8 @@ impl Plotter {
             })
         };
 
-        element_mesh.refine(&|p| curve_dist_fn.eval(p), should_refine_triangle);
+        element_mesh
+            .refine(&|&p| curve_dist_fn.eval(p), should_refine_triangle);
 
         // Build isoline data
         let mut isoline_vertex_data: Vec<Vertex<Dist>> = isoline_thresholds

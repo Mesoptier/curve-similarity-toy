@@ -3,6 +3,13 @@ use approx::{AbsDiffEq, RelativeEq, UlpsEq};
 use serde::{Deserialize, Serialize};
 use std::ops::{Add, Mul};
 
+#[macro_export]
+macro_rules! pnt {
+    ($x:expr, $y:expr) => {
+        Point { x: $x, y: $y }
+    };
+}
+
 #[derive(Serialize, Deserialize, Copy, Clone, Debug, Default, PartialEq)]
 #[repr(C)]
 pub struct Point {
