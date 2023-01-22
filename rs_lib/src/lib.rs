@@ -13,7 +13,8 @@ use crate::geom::curve::Curve;
 use crate::geom::point::Point;
 use crate::geom::{Dist, JsCurve};
 use crate::plot::element_mesh::{ElementMesh, Vertex};
-use crate::traits::mix::Mix;
+use crate::plot::isolines::BuildIsolines;
+use crate::traits::mix::{InverseMix, Mix};
 use crate::traits::vec_ext::VecExt;
 
 mod geom;
@@ -30,51 +31,6 @@ const BYTES_PER_FLOAT: i32 = 4;
 const FLOATS_PER_POSITION: i32 = 2;
 const FLOATS_PER_VALUE: i32 = 1;
 const FLOATS_PER_VERTEX: i32 = FLOATS_PER_POSITION + FLOATS_PER_VALUE;
-
-fn get_t(min: Dist, max: Dist, x: Dist) -> Dist {
-    if min > max {
-        return 1.0 - get_t(max, min, x);
-    }
-    (x - min) / (max - min)
-}
-
-fn make_isolines(
-    mesh: &ElementMesh<Dist>,
-    threshold: Dist,
-) -> Vec<Vertex<Dist>> {
-    let mut isoline_vertices = vec![];
-
-    let mut push_edge = |v1: &Vertex<Dist>, v2: &Vertex<Dist>| {
-        let t = get_t(v1.value, v2.value, threshold);
-        isoline_vertices.push(v1.mix(*v2, t));
-    };
-
-    for triangle in mesh.iter_triangle_vertices() {
-        let [v0, v1, v2] = triangle;
-
-        match (
-            v0.value > threshold,
-            v1.value > threshold,
-            v2.value > threshold,
-        ) {
-            (true, true, true) | (false, false, false) => {}
-            (true, true, false) | (false, false, true) => {
-                push_edge(v0, v2);
-                push_edge(v1, v2);
-            }
-            (true, false, true) | (false, true, false) => {
-                push_edge(v0, v1);
-                push_edge(v2, v1);
-            }
-            (true, false, false) | (false, true, true) => {
-                push_edge(v1, v0);
-                push_edge(v2, v0);
-            }
-        }
-    }
-
-    isoline_vertices
-}
 
 fn subdivide_lengths(lengths: &Vec<Dist>, res: Dist) -> Vec<Dist> {
     if lengths.is_empty() {
@@ -300,7 +256,7 @@ impl Plotter {
                     continue;
                 }
 
-                let t = get_t(min_value, max_value, threshold_value);
+                let t = threshold_value.inverse_mix(min_value, max_value);
 
                 let evaluated_value =
                     value_at_point(&left.point.mix(right.point, t));
@@ -332,7 +288,13 @@ impl Plotter {
         // Build isoline data
         let mut isoline_vertex_data: Vec<Vertex<Dist>> = isoline_thresholds
             .into_iter()
-            .flat_map(|threshold| make_isolines(&element_mesh, threshold))
+            .flat_map(|threshold| {
+                BuildIsolines::new(
+                    element_mesh.iter_triangle_vertices(),
+                    threshold,
+                )
+            })
+            .flatten()
             .collect();
 
         if show_mesh {

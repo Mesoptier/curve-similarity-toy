@@ -1,4 +1,4 @@
-use std::ops::{Add, Mul};
+use std::ops::{Add, Div, Mul, Sub};
 
 pub trait Mix<Weight, Rhs = Self> {
     type Output;
@@ -21,3 +21,25 @@ macro_rules! mix_impl {
 }
 
 mix_impl! { f32 f64 }
+
+pub trait InverseMix<Weight> {
+    fn inverse_mix(self, lo: Self, hi: Self) -> Weight;
+}
+
+macro_rules! inverse_mix_impl {
+    ($($t:ty)*) => ($(
+        impl<T> InverseMix<$t> for T
+        where
+            T: Copy + Sub<T, Output = T> + Div<T, Output = $t> + PartialOrd<T>,
+        {
+            fn inverse_mix(self, lo: Self, hi: Self) -> $t {
+                if lo > hi {
+                    return 1.0 - self.inverse_mix(hi, lo);
+                }
+                (self - lo) / (hi - lo)
+            }
+        }
+    )*)
+}
+
+inverse_mix_impl! { f32 f64 }
