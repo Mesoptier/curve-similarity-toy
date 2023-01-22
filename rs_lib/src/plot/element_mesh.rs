@@ -220,33 +220,29 @@ impl<Value> ElementMesh<Value> {
         #[derive(Debug)]
         struct Entry {
             triangle_idx: usize,
-            edge_idx: usize,
-            edge_degree: usize,
+            triangle_degree: usize,
         }
 
-        let mut queue = VecDeque::from_iter(
-            (0..self.triangles.len()).flat_map(|triangle_idx| {
-                (0..3).map(move |edge_idx| Entry {
-                    triangle_idx,
-                    edge_idx,
-                    edge_degree: if edge_idx == 0 { 0 } else { 1 },
-                })
-            }),
-        );
+        let mut queue = VecDeque::from_iter((0..self.triangles.len()).map(
+            |triangle_idx| Entry {
+                triangle_idx,
+                triangle_degree: 0,
+            },
+        ));
 
         let min_degree = 1;
         let max_degree = 10;
 
         while let Some(entry) = queue.pop_front() {
-            if entry.edge_degree > max_degree {
+            if entry.triangle_degree > max_degree {
                 continue;
             }
-            if self.triangles[entry.triangle_idx].edge_degree(entry.edge_idx)
-                != entry.edge_degree
+            if self.triangles[entry.triangle_idx].degree
+                != entry.triangle_degree
             {
                 continue;
             }
-            if entry.edge_degree >= min_degree
+            if entry.triangle_degree >= min_degree
                 && !should_refine_triangle(
                     self.triangles[entry.triangle_idx]
                         .elements
@@ -256,44 +252,12 @@ impl<Value> ElementMesh<Value> {
                 continue;
             }
 
-            let mut handle_entry = |entry: Entry| {
-                assert_eq!(entry.edge_idx, 0);
-                assert_eq!(
-                    self.triangles[entry.triangle_idx]
-                        .edge_degree(entry.edge_idx),
-                    entry.edge_degree
-                );
-
-                let new_triangles = self
-                    .refine_triangle_base(entry.triangle_idx, value_at_point);
-                queue.extend(new_triangles.iter().flat_map(|&triangle_idx| {
-                    (0..3).map(move |edge_idx| Entry {
-                        triangle_idx,
-                        edge_idx,
-                        edge_degree: entry.edge_degree
-                            + 1
-                            + if edge_idx == 0 { 0 } else { 1 },
-                    })
-                }));
-                new_triangles
-            };
-
-            let entry = if entry.edge_idx != 0 {
-                let new_triangle_idx = handle_entry(Entry {
-                    edge_idx: 0,
-                    edge_degree: entry.edge_degree - 1,
-                    ..entry
-                })[entry.edge_idx - 1];
-                Entry {
-                    triangle_idx: new_triangle_idx,
-                    edge_idx: 0,
-                    edge_degree: entry.edge_degree,
-                }
-            } else {
-                entry
-            };
-
-            handle_entry(entry);
+            let new_triangles =
+                self.refine_triangle_base(entry.triangle_idx, value_at_point);
+            queue.extend(new_triangles.iter().map(|&triangle_idx| Entry {
+                triangle_idx,
+                triangle_degree: entry.triangle_degree + 1,
+            }));
         }
     }
 
