@@ -13,6 +13,7 @@ use crate::geom::curve::Curve;
 use crate::geom::point::Point;
 use crate::geom::{Dist, JsCurve};
 use crate::plot::element_mesh::{ElementMesh, Vertex};
+use crate::plot::isolines;
 use crate::plot::isolines::BuildIsolines;
 use crate::traits::mix::{InverseMix, Mix};
 use crate::traits::vec_ext::VecExt;
@@ -245,45 +246,28 @@ impl Plotter {
             .map(|w| min_v + (max_v - min_v) * w)
             .collect_vec();
 
-        let should_refine_edge = |edge: [&Vertex<Dist>; 2]| -> bool {
-            let [left, right] = edge;
-
-            let min_value = left.value.min(right.value);
-            let max_value = left.value.max(right.value);
-
-            for &threshold_value in &isoline_thresholds {
-                if threshold_value < min_value || max_value < threshold_value {
-                    continue;
-                }
-
-                let t = threshold_value.inverse_mix(min_value, max_value);
-
-                let evaluated_value =
-                    value_at_point(&left.point.mix(right.point, t));
-                let error = (threshold_value - evaluated_value).abs();
-
-                if error > 0.1 {
-                    return true;
-                }
-            }
-
-            false
-        };
-
         let should_refine_triangle = |triangle: [&Vertex<Dist>; 3]| -> bool {
-            let [v1, v2, v3] = triangle;
-            let mid_point = (v1.point + v2.point + v3.point) * (1. / 3.);
-            let mid_value_lerp = (v1.value + v2.value + v3.value) * (1. / 3.);
-            let mid_value_eval = value_at_point(&mid_point);
-            let error = (mid_value_lerp - mid_value_eval).abs();
-            error > 0.1
+            isoline_thresholds.iter().any(|&threshold_value| {
+                isolines::analyze_triangle(triangle, threshold_value)
+                    .map(|[v0, v1]| {
+                        // TODO: Base max_error on (estimated) gradient at the isoline
+                        let max_error = 0.1;
+
+                        let should_refine_vertex = |v: Vertex<Dist>| {
+                            let true_value = value_at_point(&v.point);
+                            let error = (v.value - true_value).abs();
+                            error > max_error
+                        };
+
+                        should_refine_vertex(v0)
+                            || should_refine_vertex(v1)
+                            || should_refine_vertex(v0.mix(v1, 0.5))
+                    })
+                    .unwrap_or(false)
+            })
         };
 
-        element_mesh.refine(
-            &value_at_point,
-            should_refine_edge,
-            should_refine_triangle,
-        );
+        element_mesh.refine(&value_at_point, should_refine_triangle);
 
         // Build isoline data
         let mut isoline_vertex_data: Vec<Vertex<Dist>> = isoline_thresholds

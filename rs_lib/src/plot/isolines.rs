@@ -2,7 +2,7 @@ use crate::geom::Dist;
 use crate::plot::element_mesh::Vertex;
 use crate::traits::mix::{InverseMix, Mix};
 
-fn analyze_triangle(
+pub fn analyze_triangle(
     triangle: [&Vertex<Dist>; 3],
     threshold: Dist,
 ) -> Option<[Vertex<Dist>; 2]> {
