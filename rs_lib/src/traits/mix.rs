@@ -7,14 +7,15 @@ pub trait Mix<Weight, Rhs = Self> {
 
 macro_rules! mix_impl {
     ($($t:ty)*) => ($(
-        impl<T> Mix<$t, T> for T
+        impl<T, D> Mix<$t, T> for T
         where
-            T: Add<T, Output = T> + Mul<$t, Output = T>,
+            T: Clone + Add<D, Output = T> + Sub<T, Output = D>,
+            D: Mul<$t, Output = D>,
         {
             type Output = T;
 
             fn mix(self, other: T, t: $t) -> Self::Output {
-                self * (1.0 - t) + other * t
+                self.clone() + (other - self) * t
             }
         }
     )*)

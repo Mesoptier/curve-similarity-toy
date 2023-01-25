@@ -1,16 +1,16 @@
-use self::curve::Curve;
-use self::point::Point;
+use nalgebra::Point;
 use wasm_bindgen::prelude::*;
+
+use self::curve::Curve;
 
 pub mod curve;
 pub mod curve_dist_fn;
-pub mod point;
 
 pub type Dist = f32;
 
 #[wasm_bindgen(typescript_custom_section)]
 const TYPESCRIPT_CUSTOM_SECTION: &'static str = r#"
-export type IPoint = { x:number, y: number };
+export type IPoint = [x: number, y: number];
 export type IPoints = IPoint[];
 export type ILengths = number[];
 "#;
@@ -33,7 +33,7 @@ pub struct JsCurve(Curve);
 impl JsCurve {
     #[wasm_bindgen(constructor)]
     pub fn new(points: IPoints) -> Self {
-        let points: Vec<Point> =
+        let points: Vec<Point<Dist, 2>> =
             serde_wasm_bindgen::from_value(points.into()).unwrap();
         Self(Curve::from_points(points))
     }

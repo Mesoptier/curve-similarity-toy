@@ -7,7 +7,7 @@ function makePathDefinition(curve: JsCurve): string {
     if (points.length === 0) {
         return '';
     }
-    return 'M' + points.map(({ x, y }) => `${x},${y}`).join(' ');
+    return 'M' + points.map(([x, y]) => `${x},${y}`).join(' ');
 }
 
 interface CurveSpaceViewCanvasProps {
@@ -64,10 +64,10 @@ function CurveSpaceViewCanvas(props: CurveSpaceViewCanvasProps): JSX.Element {
         <svg
             onClick={(e) => {
                 const curveIdx = e.ctrlKey ? 1 : 0;
-                const newPoint = {
-                    x: e.clientX - e.currentTarget.getBoundingClientRect().x,
-                    y: e.clientY - e.currentTarget.getBoundingClientRect().y,
-                };
+                const newPoint: IPoint = [
+                    e.clientX - e.currentTarget.getBoundingClientRect().x,
+                    e.clientY - e.currentTarget.getBoundingClientRect().y,
+                ];
 
                 updateCurves((curves) => {
                     curves = [...curves];
@@ -77,10 +77,10 @@ function CurveSpaceViewCanvas(props: CurveSpaceViewCanvasProps): JSX.Element {
             }}
             onMouseMove={(e) => {
                 const curveIdx = e.ctrlKey ? 1 : 0;
-                const newPoint = {
-                    x: e.clientX - e.currentTarget.getBoundingClientRect().x,
-                    y: e.clientY - e.currentTarget.getBoundingClientRect().y,
-                };
+                const newPoint: IPoint = [
+                    e.clientX - e.currentTarget.getBoundingClientRect().x,
+                    e.clientY - e.currentTarget.getBoundingClientRect().y,
+                ];
 
                 const previewPoints: PreviewPoints = [null, null];
                 previewPoints[curveIdx] = newPoint;
@@ -122,7 +122,7 @@ function CurvePreview(props: CurvePreviewProps): JSX.Element | null {
 
     return (
         <g className="curve" data-curve-idx={curveIdx}>
-            {curve.points.map(({ x, y }, pointIdx) => (
+            {curve.points.map(([x, y], pointIdx) => (
                 <circle key={pointIdx} className="curve__point" cx={x} cy={y} />
             ))}
             <path className="curve__line" d={makePathDefinition(curve)} />
@@ -130,15 +130,15 @@ function CurvePreview(props: CurvePreviewProps): JSX.Element | null {
                 <g className="curve__preview">
                     <line
                         className="curve__line"
-                        x1={lastPoint.x}
-                        y1={lastPoint.y}
-                        x2={previewPoint.x}
-                        y2={previewPoint.y}
+                        x1={lastPoint[0]}
+                        y1={lastPoint[1]}
+                        x2={previewPoint[0]}
+                        y2={previewPoint[1]}
                     />
                     <circle
                         className="curve__point"
-                        cx={previewPoint.x}
-                        cy={previewPoint.y}
+                        cx={previewPoint[0]}
+                        cy={previewPoint[1]}
                     />
                 </g>
             )}
@@ -161,16 +161,16 @@ function LeashPreview(props: LeashPreviewProps): JSX.Element {
                 <circle
                     className="leash__point"
                     key={pointIdx}
-                    cx={point.x}
-                    cy={point.y}
+                    cx={point[0]}
+                    cy={point[1]}
                 />
             ))}
             <line
                 className="leash__line"
-                x1={points[0].x}
-                y1={points[0].y}
-                x2={points[1].x}
-                y2={points[1].y}
+                x1={points[0][0]}
+                y1={points[0][1]}
+                x2={points[1][0]}
+                y2={points[1][1]}
             />
         </g>
     );

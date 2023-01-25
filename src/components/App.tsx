@@ -7,14 +7,14 @@ import { ParamSpaceView } from './ParamSpaceView';
 export function App(): JSX.Element {
     const [curves, setCurves] = useState<[JsCurve, JsCurve]>([
         new JsCurve([
-            { x: 198, y: 158 },
-            { x: 150, y: 248 },
-            { x: 91, y: 298 },
+            [198, 158],
+            [150, 248],
+            [91, 298],
         ]),
         new JsCurve([
-            { x: 300, y: 214 },
-            { x: 264, y: 344 },
-            { x: 227, y: 387 },
+            [300, 214],
+            [264, 344],
+            [227, 387],
         ]),
     ]);
 

@@ -1,38 +1,39 @@
-use crate::Mix;
+use nalgebra::Point;
 
-use super::point::Point;
-use super::Dist;
+use crate::geom::Dist;
+use crate::Mix;
 
 #[derive(Debug, Default, Clone)]
 pub struct Curve {
-    points: Vec<Point>,
+    points: Vec<Point<Dist, 2>>,
     cumulative_lengths: Vec<Dist>,
 }
 
 impl Curve {
-    fn compute_cumulative_lengths(points: &Vec<Point>) -> Vec<Dist> {
+    fn compute_cumulative_lengths(points: &Vec<Point<Dist, 2>>) -> Vec<Dist> {
         (0..points.len())
             .scan(0., |cumulative_length, idx| {
                 if idx != 0 {
-                    *cumulative_length += points[idx].dist(&points[idx - 1]);
+                    *cumulative_length +=
+                        (points[idx] - &points[idx - 1]).norm();
                 }
                 Some(*cumulative_length)
             })
             .collect()
     }
 
-    pub fn from_points(points: Vec<Point>) -> Self {
+    pub fn from_points(points: Vec<Point<Dist, 2>>) -> Self {
         Self {
             cumulative_lengths: Self::compute_cumulative_lengths(&points),
             points,
         }
     }
 
-    pub fn push(&mut self, point: Point) {
+    pub fn push(&mut self, point: Point<Dist, 2>) {
         let new_length =
             match (self.points.last(), self.cumulative_lengths.last()) {
                 (Some(last_point), Some(last_length)) => {
-                    *last_length + point.dist(last_point)
+                    *last_length + (point - last_point).norm()
                 }
                 (None, None) => 0.,
                 _ => unreachable!(),
@@ -46,7 +47,7 @@ impl Curve {
         *self.cumulative_lengths.last().unwrap()
     }
 
-    pub fn at(&self, length: Dist) -> Point {
+    pub fn at(&self, length: Dist) -> Point<Dist, 2> {
         let length = length.clamp(0., self.total_length());
 
         let idx = self
@@ -69,7 +70,7 @@ impl Curve {
         }
     }
 
-    pub fn points(&self) -> &Vec<Point> {
+    pub fn points(&self) -> &Vec<Point<Dist, 2>> {
         &self.points
     }
 
@@ -81,24 +82,25 @@ impl Curve {
 #[cfg(test)]
 mod test {
     use approx::assert_relative_eq;
+    use nalgebra::point;
 
     use super::*;
 
     #[test]
     fn curve_at() {
         let points = vec![
-            Point { x: 0.0, y: 0.0 },
-            Point { x: 1.0, y: 0.0 },
-            Point { x: 1.5, y: 0.0 },
-            Point { x: 2.0, y: 0.0 },
+            point![0.0, 0.0],
+            point![1.0, 0.0],
+            point![1.5, 0.0],
+            point![2.0, 0.0],
         ];
         let curve = Curve::from_points(points);
 
-        assert_relative_eq!(curve.at(0.0), Point { x: 0.0, y: 0.0 });
-        assert_relative_eq!(curve.at(0.5), Point { x: 0.5, y: 0.0 });
-        assert_relative_eq!(curve.at(1.0), Point { x: 1.0, y: 0.0 });
-        assert_relative_eq!(curve.at(1.5), Point { x: 1.5, y: 0.0 });
-        assert_relative_eq!(curve.at(1.8), Point { x: 1.8, y: 0.0 });
-        assert_relative_eq!(curve.at(2.0), Point { x: 2.0, y: 0.0 });
+        assert_relative_eq!(curve.at(0.0), point![0.0, 0.0]);
+        assert_relative_eq!(curve.at(0.5), point![0.5, 0.0]);
+        assert_relative_eq!(curve.at(1.0), point![1.0, 0.0]);
+        assert_relative_eq!(curve.at(1.5), point![1.5, 0.0]);
+        assert_relative_eq!(curve.at(1.8), point![1.8, 0.0]);
+        assert_relative_eq!(curve.at(2.0), point![2.0, 0.0]);
     }
 }

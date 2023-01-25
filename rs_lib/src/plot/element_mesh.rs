@@ -1,16 +1,17 @@
 use std::collections::VecDeque;
 
 use itertools::Itertools;
+use nalgebra::Point;
 
 use crate::{
-    geom::{point::Point, Dist},
+    geom::{Dist},
     traits::mix::Mix,
 };
 
 #[derive(Clone, Copy, Debug)]
 #[repr(C)]
 pub struct Vertex<Value> {
-    pub point: Point,
+    pub point: Point<Dist, 2>,
     pub value: Value,
 }
 
@@ -18,7 +19,7 @@ impl<Weight, Value> Mix<Weight> for Vertex<Value>
 where
     Weight: Copy,
     Value: Mix<Weight, Output = Value>,
-    Point: Mix<Weight, Output = Point>,
+    Point<Dist, 2>: Mix<Weight, Output = Point<Dist, 2>>,
 {
     type Output = Vertex<Value>;
 
@@ -63,7 +64,7 @@ impl<Value> ElementMesh<Value> {
         mut value_at_point: F,
     ) -> Self
     where
-        F: FnMut(&Point) -> Value,
+        F: FnMut(&Point<Dist, 2>) -> Value,
     {
         let (x_points, y_points) = points;
 
@@ -72,7 +73,7 @@ impl<Value> ElementMesh<Value> {
             x_points.iter().copied(),
             y_points.iter().copied(),
         )
-        .map_into()
+        .map(|(x, y)| Point::from([x, y]))
         .map(|point| Vertex {
             point,
             value: value_at_point(&point),
@@ -206,7 +207,7 @@ impl<Value> ElementMesh<Value> {
     // TODO: Refactor this whole mess
     pub fn refine(
         &mut self,
-        value_at_point: &impl Fn(&Point) -> Value,
+        value_at_point: &impl Fn(&Point<Dist, 2>) -> Value,
         should_refine_triangle: impl Fn([&Vertex<Value>; 3]) -> bool,
     ) {
         #[derive(Debug)]
@@ -256,7 +257,7 @@ impl<Value> ElementMesh<Value> {
     fn refine_triangle_base(
         &mut self,
         triangle_idx: usize,
-        value_at_point: &impl Fn(&Point) -> Value,
+        value_at_point: &impl Fn(&Point<Dist, 2>) -> Value,
     ) -> [usize; 2] {
         let triangle = self.triangles[triangle_idx];
 
