@@ -11,6 +11,8 @@ use web_sys::{
 
 use crate::geom::curve::Curve;
 use crate::geom::{Dist, JsCurve};
+use crate::math::function::Function;
+use crate::math::gradient::Gradient;
 use crate::plot::curve_dist_fn::CurveDistFn;
 use crate::plot::element_mesh::{ElementMesh, Vertex};
 use crate::plot::isolines;
@@ -19,6 +21,7 @@ use crate::traits::mix::Mix;
 use crate::traits::vec_ext::VecExt;
 
 mod geom;
+mod math;
 mod plot;
 mod traits;
 
@@ -224,7 +227,7 @@ impl Plotter {
 
         let mut element_mesh =
             ElementMesh::from_points((&x_points, &y_points), |point| {
-                let value = curve_dist_fn.eval(*point);
+                let value = curve_dist_fn.eval((*point).into());
 
                 // TODO: Should these just be properties on ElementMesh?
                 min_v = min_v.min(value);
@@ -246,9 +249,11 @@ impl Plotter {
                 isolines::analyze_triangle(triangle, threshold_value)
                     .map(|[v0, v1]| {
                         let should_refine_vertex = |v: Vertex<Dist>| {
-                            let grad =
-                                curve_dist_fn.eval_gradient_magnitude(v.point);
-                            let true_value = curve_dist_fn.eval(v.point);
+                            let grad = curve_dist_fn
+                                .gradient()
+                                .eval(v.point.into())
+                                .magnitude();
+                            let true_value = curve_dist_fn.eval(v.point.into());
                             let error = (v.value - true_value).abs();
 
                             // TODO: Does this actually make sense?
@@ -264,7 +269,7 @@ impl Plotter {
         };
 
         element_mesh
-            .refine(&|&p| curve_dist_fn.eval(p), should_refine_triangle);
+            .refine(&|&p| curve_dist_fn.eval(p.into()), should_refine_triangle);
 
         // Build isoline data
         let mut isoline_vertex_data: Vec<Vertex<Dist>> = isoline_thresholds

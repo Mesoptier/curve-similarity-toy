@@ -1,8 +1,8 @@
-use itertools::Itertools;
 use std::collections::VecDeque;
 
+use itertools::Itertools;
+
 use crate::{
-    console_log,
     geom::{point::Point, Dist},
     traits::mix::Mix,
 };
@@ -49,14 +49,6 @@ impl Triangle {
         let mut edge = self.edge(edge_idx);
         edge.reverse();
         edge
-    }
-
-    fn edge_degree(&self, edge_idx: usize) -> usize {
-        if edge_idx == 0 {
-            self.degree
-        } else {
-            self.degree + 1
-        }
     }
 }
 
@@ -387,10 +379,6 @@ impl<Value> ElementMesh<Value> {
 
     pub fn vertices(&self) -> &Vec<Vertex<Value>> {
         &self.vertices
-    }
-
-    pub fn triangles(&self) -> &Vec<Triangle> {
-        &self.triangles
     }
 }
 

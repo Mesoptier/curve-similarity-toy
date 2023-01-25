@@ -36,6 +36,12 @@ impl From<Point> for (Dist, Dist) {
     }
 }
 
+impl From<Point> for nalgebra::Point<Dist, 2> {
+    fn from(p: Point) -> Self {
+        nalgebra::Point2::from([p.x, p.y])
+    }
+}
+
 impl Add<Point> for Point {
     type Output = Point;
 
