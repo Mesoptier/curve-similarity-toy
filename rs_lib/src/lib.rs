@@ -3,15 +3,16 @@ use std::str::FromStr;
 
 use itertools::Itertools;
 use palette::{Pixel, Srgb};
+use serde::Deserialize;
 use wasm_bindgen::prelude::*;
 use web_sys::{
     WebGl2RenderingContext, WebGlBuffer, WebGlProgram, WebGlShader,
     WebGlUniformLocation, WebGlVertexArrayObject,
 };
 
-use crate::geom::{Dist, JsCurve};
 use crate::geom::curve::Curve;
 use crate::geom::curve_dist_fn::CurveDistFn;
+use crate::geom::{Dist, JsCurve};
 use crate::math::function::Function;
 use crate::math::gradient::Gradient;
 use crate::plot::element_mesh::{ElementMesh, Vertex};
@@ -36,7 +37,11 @@ const FLOATS_PER_POSITION: i32 = 2;
 const FLOATS_PER_VALUE: i32 = 1;
 const FLOATS_PER_VERTEX: i32 = FLOATS_PER_POSITION + FLOATS_PER_VALUE;
 
-fn subdivide_lengths(lengths: &Vec<Dist>, res: Dist) -> Vec<Dist> {
+fn subdivide_lengths(
+    lengths: &Vec<Dist>,
+    res: Dist,
+    [min, max]: [Dist; 2],
+) -> Vec<Dist> {
     if lengths.is_empty() {
         return vec![];
     }
@@ -56,7 +61,37 @@ fn subdivide_lengths(lengths: &Vec<Dist>, res: Dist) -> Vec<Dist> {
                     })
                 }),
         )
+        .map(|length| length.clamp(min, max))
+        .dedup()
         .collect()
+}
+
+#[wasm_bindgen(typescript_custom_section)]
+const TYPESCRIPT_CUSTOM_SECTION: &'static str = r#"
+export type IDrawOptions = {
+    show_mesh: boolean;
+    x_bounds: [min: number, max: number];
+    y_bounds: [min: number, max: number];
+    canvas_width: number;
+    canvas_height: number;
+    device_pixel_ratio: number;
+};
+"#;
+
+#[wasm_bindgen]
+extern "C" {
+    #[wasm_bindgen(typescript_type = "IDrawOptions")]
+    pub type IDrawOptions;
+}
+
+#[derive(Deserialize)]
+struct DrawOptions {
+    show_mesh: bool,
+    x_bounds: [f32; 2],
+    y_bounds: [f32; 2],
+    canvas_width: i32,
+    canvas_height: i32,
+    device_pixel_ratio: f32,
 }
 
 #[wasm_bindgen(getter_with_clone)]
@@ -209,15 +244,41 @@ impl Plotter {
         })
     }
 
-    pub fn draw(&self, show_mesh: bool) {
+    pub fn draw(&self, options: IDrawOptions) {
+        let DrawOptions {
+            show_mesh,
+            x_bounds,
+            y_bounds,
+            canvas_width,
+            canvas_height,
+            device_pixel_ratio,
+            ..
+        } = serde_wasm_bindgen::from_value(options.into()).unwrap();
+
         let context = &self.context;
+
+        context.viewport(0, 0, canvas_width, canvas_height);
+
+        if let Ok(range) = context.get_parameter(WebGl2RenderingContext::ALIASED_LINE_WIDTH_RANGE) {
+            let range: js_sys::Float32Array = range.into();
+            let min_line_width = range.at(0).unwrap();
+            let max_line_width = range.at(1).unwrap();
+            let line_width = device_pixel_ratio.clamp(min_line_width, max_line_width);
+            context.line_width(line_width);
+        }
 
         // Build mesh
         let res = 64.;
-        let x_points =
-            subdivide_lengths(self.curves[0].cumulative_lengths(), res);
-        let y_points =
-            subdivide_lengths(self.curves[1].cumulative_lengths(), res);
+        let x_points = subdivide_lengths(
+            self.curves[0].cumulative_lengths(),
+            res,
+            x_bounds,
+        );
+        let y_points = subdivide_lengths(
+            self.curves[1].cumulative_lengths(),
+            res,
+            y_bounds,
+        );
 
         let mut min_v = f32::INFINITY;
         let mut max_v = f32::NEG_INFINITY;
@@ -416,10 +477,6 @@ impl Plotter {
 
     pub fn update_curves(&mut self, curve_1: &JsCurve, curve_2: &JsCurve) {
         self.curves = [curve_1.clone().into(), curve_2.clone().into()];
-    }
-
-    pub fn resize(&self, width: i32, height: i32) {
-        self.context.viewport(0, 0, width, height);
     }
 }
 

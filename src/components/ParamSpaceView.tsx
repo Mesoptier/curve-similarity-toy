@@ -1,6 +1,6 @@
 import { type Dispatch, type SetStateAction, useEffect, useState } from 'react';
 
-import { Plotter, JsCurve } from '@rs_lib';
+import { JsCurve, Plotter } from '@rs_lib';
 
 const CURVE_OFFSET = 20;
 const PLOT_OFFSET = 40;
@@ -217,6 +217,26 @@ function ParamSpaceViewCanvas(props: ParamSpaceViewCanvasProps): JSX.Element {
     );
 }
 
+function useDevicePixelRatio(): number {
+    const [devicePixelRatio, setDevicePixelRatio] = useState(
+        window.devicePixelRatio,
+    );
+    useEffect(() => {
+        const media = window.matchMedia(
+            `(resolution: ${devicePixelRatio}dppx)`,
+        );
+        const handleChange = () => {
+            setDevicePixelRatio(window.devicePixelRatio);
+        };
+
+        media.addEventListener('change', handleChange);
+        return () => {
+            media.removeEventListener('change', handleChange);
+        };
+    }, [devicePixelRatio]);
+    return devicePixelRatio;
+}
+
 interface PlotProps {
     curves: [JsCurve, JsCurve];
     width: number;
@@ -229,6 +249,10 @@ function Plot(props: PlotProps): JSX.Element {
 
     const [canvas, setCanvas] = useState<HTMLCanvasElement | null>(null);
     const [plotter, setPlotter] = useState<Plotter | null>(null);
+
+    const devicePixelRatio = useDevicePixelRatio();
+    const canvasWidth = Math.round(width * devicePixelRatio);
+    const canvasHeight = Math.round(height * devicePixelRatio);
 
     useEffect(() => {
         if (canvas === null) {
@@ -245,16 +269,36 @@ function Plot(props: PlotProps): JSX.Element {
         }
 
         plotter.update_curves(...curves);
-        plotter.resize(width, height);
-        plotter.draw(showMesh);
-    }, [plotter, curves, width, height, showMesh]);
+        plotter.draw({
+            show_mesh: showMesh,
+            x_bounds: [0, width],
+            y_bounds: [0, height],
+            canvas_width: canvasWidth,
+            canvas_height: canvasHeight,
+            device_pixel_ratio: devicePixelRatio,
+        });
+    }, [
+        plotter,
+        curves,
+        showMesh,
+        width,
+        height,
+        canvasWidth,
+        canvasHeight,
+        devicePixelRatio,
+    ]);
 
     return (
         <canvas
             ref={setCanvas}
-            width={width}
-            height={height}
-            style={{ transform: 'scale(1, -1)', transformOrigin: '50% 50%' }}
+            width={canvasWidth}
+            height={canvasHeight}
+            style={{
+                width: `${width}px`,
+                height: `${height}px`,
+                transform: 'scale(1, -1)',
+                transformOrigin: '50% 50%',
+            }}
         />
     );
 }
