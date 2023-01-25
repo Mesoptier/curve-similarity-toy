@@ -1,6 +1,7 @@
+use crate::Mix;
+
 use super::point::Point;
 use super::Dist;
-use crate::Mix;
 
 #[derive(Debug, Default, Clone)]
 pub struct Curve {
@@ -79,8 +80,9 @@ impl Curve {
 
 #[cfg(test)]
 mod test {
-    use super::*;
     use approx::assert_relative_eq;
+
+    use super::*;
 
     #[test]
     fn curve_at() {
