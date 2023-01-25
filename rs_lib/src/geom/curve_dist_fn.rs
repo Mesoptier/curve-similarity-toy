@@ -23,8 +23,8 @@ impl<'f> Function<'f, Point<Dist, 2>> for CurveDistFn<'f> {
 
     fn eval(&self, p: Point<Dist, 2>) -> Self::Output {
         let [c1, c2] = self.curves;
-        let p1 = c1.at(p.x);
-        let p2 = c2.at(p.y);
+        let p1 = c1.eval(p.x);
+        let p2 = c2.eval(p.y);
         (p1 - p2).norm()
     }
 }

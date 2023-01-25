@@ -1,6 +1,7 @@
 use nalgebra::Point;
 
 use crate::geom::Dist;
+use crate::math::function::Function;
 use crate::Mix;
 
 #[derive(Debug, Default, Clone)]
@@ -47,7 +48,19 @@ impl Curve {
         *self.cumulative_lengths.last().unwrap()
     }
 
-    pub fn at(&self, length: Dist) -> Point<Dist, 2> {
+    pub fn points(&self) -> &Vec<Point<Dist, 2>> {
+        &self.points
+    }
+
+    pub fn cumulative_lengths(&self) -> &Vec<Dist> {
+        &self.cumulative_lengths
+    }
+}
+
+impl<'f> Function<'f, Dist> for Curve {
+    type Output = Point<Dist, 2>;
+
+    fn eval(&'f self, length: Dist) -> Self::Output {
         let length = length.clamp(0., self.total_length());
 
         let idx = self
@@ -69,14 +82,6 @@ impl Curve {
             point_1.mix(point_2, t)
         }
     }
-
-    pub fn points(&self) -> &Vec<Point<Dist, 2>> {
-        &self.points
-    }
-
-    pub fn cumulative_lengths(&self) -> &Vec<Dist> {
-        &self.cumulative_lengths
-    }
 }
 
 #[cfg(test)]
@@ -96,11 +101,11 @@ mod test {
         ];
         let curve = Curve::from_points(points);
 
-        assert_relative_eq!(curve.at(0.0), point![0.0, 0.0]);
-        assert_relative_eq!(curve.at(0.5), point![0.5, 0.0]);
-        assert_relative_eq!(curve.at(1.0), point![1.0, 0.0]);
-        assert_relative_eq!(curve.at(1.5), point![1.5, 0.0]);
-        assert_relative_eq!(curve.at(1.8), point![1.8, 0.0]);
-        assert_relative_eq!(curve.at(2.0), point![2.0, 0.0]);
+        assert_relative_eq!(curve.eval(0.0), point![0.0, 0.0]);
+        assert_relative_eq!(curve.eval(0.5), point![0.5, 0.0]);
+        assert_relative_eq!(curve.eval(1.0), point![1.0, 0.0]);
+        assert_relative_eq!(curve.eval(1.5), point![1.5, 0.0]);
+        assert_relative_eq!(curve.eval(1.8), point![1.8, 0.0]);
+        assert_relative_eq!(curve.eval(2.0), point![2.0, 0.0]);
     }
 }

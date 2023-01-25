@@ -1,6 +1,8 @@
 use nalgebra::Point;
 use wasm_bindgen::prelude::*;
 
+use crate::math::function::Function;
+
 use self::curve::Curve;
 
 pub mod curve;
@@ -47,7 +49,7 @@ impl JsCurve {
     }
 
     pub fn at(&self, length: Dist) -> IPoint {
-        serde_wasm_bindgen::to_value(&self.0.at(length))
+        serde_wasm_bindgen::to_value(&self.0.eval(length))
             .unwrap()
             .into()
     }
