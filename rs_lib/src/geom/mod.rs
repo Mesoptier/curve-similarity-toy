@@ -3,6 +3,7 @@ use self::point::Point;
 use wasm_bindgen::prelude::*;
 
 pub mod curve;
+pub mod curve_dist_fn;
 pub mod point;
 
 pub type Dist = f32;

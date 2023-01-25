@@ -9,11 +9,11 @@ use web_sys::{
     WebGlUniformLocation, WebGlVertexArrayObject,
 };
 
-use crate::geom::curve::Curve;
 use crate::geom::{Dist, JsCurve};
+use crate::geom::curve::Curve;
+use crate::geom::curve_dist_fn::CurveDistFn;
 use crate::math::function::Function;
 use crate::math::gradient::Gradient;
-use crate::plot::curve_dist_fn::CurveDistFn;
 use crate::plot::element_mesh::{ElementMesh, Vertex};
 use crate::plot::isolines;
 use crate::plot::isolines::BuildIsolines;
