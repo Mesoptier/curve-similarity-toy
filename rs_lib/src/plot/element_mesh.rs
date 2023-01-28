@@ -3,10 +3,7 @@ use std::collections::VecDeque;
 use itertools::Itertools;
 use nalgebra::Point;
 
-use crate::{
-    geom::{Dist},
-    traits::mix::Mix,
-};
+use crate::{geom::Dist, traits::mix::Mix};
 
 #[derive(Clone, Copy, Debug)]
 #[repr(C)]
@@ -245,11 +242,15 @@ impl<Value> ElementMesh<Value> {
                 continue;
             }
 
-            let new_triangles =
-                self.refine_triangle_base(entry.triangle_idx, value_at_point);
+            let mut new_triangles = vec![];
+            self.refine_triangle_base(
+                entry.triangle_idx,
+                value_at_point,
+                &mut new_triangles,
+            );
             queue.extend(new_triangles.iter().map(|&triangle_idx| Entry {
                 triangle_idx,
-                triangle_degree: entry.triangle_degree + 1,
+                triangle_degree: self.triangles[triangle_idx].degree,
             }));
         }
     }
@@ -258,6 +259,7 @@ impl<Value> ElementMesh<Value> {
         &mut self,
         triangle_idx: usize,
         value_at_point: &impl Fn(&Point<Dist, 2>) -> Value,
+        new_triangles: &mut Vec<usize>,
     ) -> [usize; 2] {
         let triangle = self.triangles[triangle_idx];
 
@@ -278,6 +280,7 @@ impl<Value> ElementMesh<Value> {
                     self.refine_triangle_base(
                         other_triangle_idx,
                         value_at_point,
+                        new_triangles,
                     )[other_edge_idx - 1]
                 }
             },
@@ -339,6 +342,9 @@ impl<Value> ElementMesh<Value> {
                     self.triangles[t].connectivity[e] = Some((triangle_idx, 0));
                 }
             }
+
+            new_triangles.push(triangle_idx);
+            new_triangles.push(new_triangle_idx);
 
             [(triangle_idx, 2), (new_triangle_idx, 1)]
         };

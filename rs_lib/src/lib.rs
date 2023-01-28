@@ -259,11 +259,14 @@ impl Plotter {
 
         context.viewport(0, 0, canvas_width, canvas_height);
 
-        if let Ok(range) = context.get_parameter(WebGl2RenderingContext::ALIASED_LINE_WIDTH_RANGE) {
+        if let Ok(range) = context
+            .get_parameter(WebGl2RenderingContext::ALIASED_LINE_WIDTH_RANGE)
+        {
             let range: js_sys::Float32Array = range.into();
             let min_line_width = range.at(0).unwrap();
             let max_line_width = range.at(1).unwrap();
-            let line_width = device_pixel_ratio.clamp(min_line_width, max_line_width);
+            let line_width =
+                device_pixel_ratio.clamp(min_line_width, max_line_width);
             context.line_width(line_width);
         }
 
@@ -288,7 +291,7 @@ impl Plotter {
 
         let mut element_mesh =
             ElementMesh::from_points((&x_points, &y_points), |point| {
-                let value = curve_dist_fn.eval((*point).into());
+                let value = curve_dist_fn.eval(*point);
 
                 // TODO: Should these just be properties on ElementMesh?
                 min_v = min_v.min(value);
@@ -305,20 +308,20 @@ impl Plotter {
             .map(|w| min_v + (max_v - min_v) * w)
             .collect_vec();
 
+        let isoline_precision = 0.2;
+
         let should_refine_triangle = |triangle: [&Vertex<Dist>; 3]| -> bool {
             isoline_thresholds.iter().any(|&threshold_value| {
                 isolines::analyze_triangle(triangle, threshold_value)
                     .map(|[v0, v1]| {
                         let should_refine_vertex = |v: Vertex<Dist>| {
-                            let grad = curve_dist_fn
+                            let gradient_magnitude = curve_dist_fn
                                 .gradient()
-                                .eval(v.point.into())
+                                .eval(v.point)
                                 .magnitude();
-                            let true_value = curve_dist_fn.eval(v.point.into());
+                            let true_value = curve_dist_fn.eval(v.point);
                             let error = (v.value - true_value).abs();
-
-                            // TODO: Does this actually make sense?
-                            error > 0.05 * grad
+                            error > isoline_precision * gradient_magnitude
                         };
 
                         should_refine_vertex(v0)
@@ -330,12 +333,12 @@ impl Plotter {
         };
 
         element_mesh
-            .refine(&|&p| curve_dist_fn.eval(p.into()), should_refine_triangle);
+            .refine(&|&p| curve_dist_fn.eval(p), should_refine_triangle);
 
         // Build isoline data
         let mut isoline_vertex_data: Vec<Vertex<Dist>> = isoline_thresholds
-            .into_iter()
-            .flat_map(|threshold| {
+            .iter()
+            .flat_map(|&threshold| {
                 BuildIsolines::new(
                     element_mesh.iter_triangle_vertices(),
                     threshold,
@@ -351,6 +354,34 @@ impl Plotter {
                     .flat_map(|[v1, v2, v3]| [v1, v2, v2, v3, v3, v1])
                     .copied(),
             );
+        }
+
+        // TODO: Remove gradient debugging code
+        let debug_gradients = true;
+        if debug_gradients {
+            for triangle in element_mesh.iter_triangle_vertices() {
+                for &threshold_value in &isoline_thresholds {
+                    if let Some([v0, v1]) =
+                        isolines::analyze_triangle(triangle, threshold_value)
+                    {
+                        for v in [v0, v1, v0.mix(v1, 0.5)] {
+                            let gradient =
+                                curve_dist_fn.gradient().eval(v.point);
+                            let true_value = curve_dist_fn.eval(v.point);
+                            let error = (v.value - true_value).abs();
+
+                            if error > isoline_precision * gradient.magnitude()
+                            {
+                                isoline_vertex_data.push(v);
+                                isoline_vertex_data.push(Vertex {
+                                    point: v.point + 10.0 * gradient,
+                                    ..v
+                                })
+                            }
+                        }
+                    }
+                }
+            }
         }
 
         fn upload_buffer_data<T>(
