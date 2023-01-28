@@ -3,10 +3,12 @@ import {
     type SetStateAction,
     useEffect,
     useMemo,
+    useRef,
     useState,
 } from 'react';
 
 import { JsCurve, Plotter } from '@rs_lib';
+import { useDrag } from '@use-gesture/react';
 
 const CURVE_OFFSET = 20;
 const PLOT_OFFSET = 40;
@@ -106,11 +108,9 @@ function useComputeBounds(
     maxPlotLength: number,
 ): Bounds {
     const totalLength = cumulativeLengths[cumulativeLengths.length - 1];
-    const bounds: Bounds = [
-        Math.max(0, 0 - offset),
-        Math.min(totalLength, maxPlotLength - offset),
-    ];
-
+    const min = Math.max(0, 0 - offset);
+    const max = Math.min(totalLength, maxPlotLength - offset);
+    const bounds: Bounds = [min, max];
     return useMemo(() => bounds, bounds);
 }
 
@@ -136,8 +136,17 @@ function ParamSpaceViewCanvas(props: ParamSpaceViewCanvasProps): JSX.Element {
         containerSize.height - (PLOT_OFFSET + CURVE_OFFSET),
     );
 
-    const [xOffset] = useState(0);
-    const [yOffset] = useState(0);
+    const [[xOffset, yOffset], setTranslation] = useState([0, 0]);
+
+    const targetRef = useRef(null);
+
+    useDrag(
+        (state) => {
+            const [xOffset, yOffset] = state.offset;
+            setTranslation([xOffset, -yOffset]);
+        },
+        { target: targetRef },
+    );
 
     const xBounds = useComputeBounds(cumulativeLengths1, xOffset, maxPlotWidth);
     const yBounds = useComputeBounds(
@@ -150,7 +159,7 @@ function ParamSpaceViewCanvas(props: ParamSpaceViewCanvasProps): JSX.Element {
     const plotHeight = yBounds[1] - yBounds[0];
 
     return (
-        <svg>
+        <svg ref={targetRef} style={{ touchAction: 'none' }}>
             <g transform={`translate(0, ${containerSize.height}) scale(1, -1)`}>
                 {/* Flattened curves along axes */}
                 <g
@@ -179,8 +188,8 @@ function ParamSpaceViewCanvas(props: ParamSpaceViewCanvasProps): JSX.Element {
                 {/* Plot canvas */}
                 <foreignObject
                     className="plot-canvas"
-                    x={PLOT_OFFSET}
-                    y={PLOT_OFFSET}
+                    x={PLOT_OFFSET + Math.max(0, xOffset)}
+                    y={PLOT_OFFSET + Math.max(0, yOffset)}
                     width={Math.round(plotWidth)}
                     height={Math.round(plotHeight)}
                     onMouseMove={(e) => {
@@ -188,8 +197,8 @@ function ParamSpaceViewCanvas(props: ParamSpaceViewCanvasProps): JSX.Element {
                             e.currentTarget.getBoundingClientRect();
 
                         setHighlightLeash([
-                            e.clientX - x - xOffset,
-                            height - (e.clientY - y) - yOffset,
+                            e.clientX - x - Math.min(0, xOffset),
+                            height - (e.clientY - y) - Math.min(0, yOffset),
                         ]);
                     }}
                     onMouseLeave={() => {
