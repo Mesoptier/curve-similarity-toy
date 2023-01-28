@@ -1,3 +1,4 @@
+use itertools::Itertools;
 use nalgebra::Point;
 
 use crate::geom::curve::Curve;
@@ -15,6 +16,32 @@ pub struct CurveDistFn<'f> {
 impl<'f> CurveDistFn<'f> {
     pub fn new(curves: [&'f Curve; 2]) -> Self {
         Self { curves }
+    }
+
+    pub fn max_dist_squared(&self) -> Dist {
+        Itertools::cartesian_product(
+            self.curves[0].points().iter(),
+            self.curves[1].points().iter(),
+        )
+        .map(|(p1, p2)| (p1 - p2).magnitude_squared())
+        .fold(Dist::NEG_INFINITY, |max_dist, dist| max_dist.max(dist))
+    }
+
+    pub fn max_dist(&self) -> Dist {
+        self.max_dist_squared().sqrt()
+    }
+
+    pub fn min_dist_squared(&self) -> Dist {
+        Itertools::cartesian_product(
+            self.curves[0].line_segments(),
+            self.curves[1].line_segments(),
+        )
+        .map(|(l1, l2)| l1.dist_squared(&l2))
+        .fold(Dist::INFINITY, |min_dist, dist| min_dist.min(dist))
+    }
+
+    pub fn min_dist(&self) -> Dist {
+        self.min_dist_squared().sqrt()
     }
 }
 

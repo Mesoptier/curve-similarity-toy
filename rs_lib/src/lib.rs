@@ -286,16 +286,11 @@ impl Plotter {
         let curve_dist_fn =
             CurveDistFn::new([&self.curves[0], &self.curves[1]]);
 
+        let min_value = curve_dist_fn.min_dist();
+        let max_value = curve_dist_fn.max_dist();
+
         let mut element_mesh =
             ElementMesh::from_points((&x_points, &y_points), &curve_dist_fn);
-
-        // Get rough bounds on the values in the mesh
-        let (min_value, max_value) = element_mesh
-            .vertices()
-            .iter()
-            .fold((Dist::INFINITY, Dist::NEG_INFINITY), |(min, max), v| {
-                (min.min(v.value), max.max(v.value))
-            });
 
         let num_isolines = 10;
         let isoline_thresholds = (0..num_isolines)

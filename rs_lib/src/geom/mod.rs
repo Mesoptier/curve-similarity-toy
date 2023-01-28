@@ -7,6 +7,7 @@ use self::curve::Curve;
 
 pub mod curve;
 pub mod curve_dist_fn;
+pub mod line_segment;
 
 pub type Dist = f32;
 

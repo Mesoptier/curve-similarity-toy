@@ -1,5 +1,7 @@
+use itertools::Itertools;
 use nalgebra::Point;
 
+use crate::geom::line_segment::LineSegment;
 use crate::geom::Dist;
 use crate::math::function::Function;
 use crate::Mix;
@@ -54,6 +56,16 @@ impl Curve {
 
     pub fn cumulative_lengths(&self) -> &Vec<Dist> {
         &self.cumulative_lengths
+    }
+
+    pub fn line_segments(
+        &self,
+    ) -> impl Iterator<Item = LineSegment<Dist, 2>> + Clone + '_ {
+        self.points
+            .iter()
+            .cloned()
+            .tuple_windows::<(_, _)>()
+            .map_into()
     }
 }
 
