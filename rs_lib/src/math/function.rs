@@ -3,3 +3,14 @@ pub trait Function<'f, T> {
 
     fn eval(&'f self, x: T) -> Self::Output;
 }
+
+impl<'f, T, O, F> Function<'f, T> for F
+where
+    F: Fn(T) -> O,
+{
+    type Output = O;
+
+    fn eval(&'f self, x: T) -> Self::Output {
+        self(x)
+    }
+}

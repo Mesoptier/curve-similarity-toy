@@ -3,6 +3,7 @@ use std::collections::VecDeque;
 use itertools::Itertools;
 use nalgebra::Point;
 
+use crate::math::function::Function;
 use crate::{geom::Dist, traits::mix::Mix};
 
 #[derive(Clone, Copy, Debug)]
@@ -56,13 +57,11 @@ pub struct ElementMesh<Value> {
 }
 
 impl<Value> ElementMesh<Value> {
-    pub fn from_points<F>(
+    pub fn from_points<'f>(
         points: (&Vec<Dist>, &Vec<Dist>),
-        mut value_at_point: F,
-    ) -> Self
-    where
-        F: FnMut(&Point<Dist, 2>) -> Value,
-    {
+        // TODO: Does this have to be a reference?
+        function: &'f impl Function<'f, Point<Dist, 2>, Output = Value>,
+    ) -> Self {
         let (x_points, y_points) = points;
 
         // Build vertices
@@ -73,7 +72,7 @@ impl<Value> ElementMesh<Value> {
         .map(|(x, y)| Point::from([x, y]))
         .map(|point| Vertex {
             point,
-            value: value_at_point(&point),
+            value: function.eval(point),
         })
         .collect_vec();
 
@@ -202,9 +201,9 @@ impl<Value> ElementMesh<Value> {
     }
 
     // TODO: Refactor this whole mess
-    pub fn refine(
+    pub fn refine<'f>(
         &mut self,
-        value_at_point: &impl Fn(&Point<Dist, 2>) -> Value,
+        function: &'f impl Function<'f, Point<Dist, 2>, Output = Value>,
         should_refine_triangle: impl Fn([&Vertex<Value>; 3]) -> bool,
     ) {
         #[derive(Debug)]
@@ -245,7 +244,7 @@ impl<Value> ElementMesh<Value> {
             let mut new_triangles = vec![];
             self.refine_triangle_base(
                 entry.triangle_idx,
-                value_at_point,
+                function,
                 &mut new_triangles,
             );
             queue.extend(new_triangles.iter().map(|&triangle_idx| Entry {
@@ -255,10 +254,10 @@ impl<Value> ElementMesh<Value> {
         }
     }
 
-    fn refine_triangle_base(
+    fn refine_triangle_base<'f>(
         &mut self,
         triangle_idx: usize,
-        value_at_point: &impl Fn(&Point<Dist, 2>) -> Value,
+        function: &'f impl Function<'f, Point<Dist, 2>, Output = Value>,
         new_triangles: &mut Vec<usize>,
     ) -> [usize; 2] {
         let triangle = self.triangles[triangle_idx];
@@ -268,7 +267,7 @@ impl<Value> ElementMesh<Value> {
             .map(|vertex_idx| &self.vertices[vertex_idx]);
 
         let mid_point = edge[0].point.mix(edge[1].point, 0.5);
-        let mid_value = value_at_point(&mid_point);
+        let mid_value = function.eval(mid_point);
 
         let other_triangle_idx = triangle.connectivity[0].map(
             |(other_triangle_idx, other_edge_idx)| {
@@ -279,7 +278,7 @@ impl<Value> ElementMesh<Value> {
                     // that's now connected at the base
                     self.refine_triangle_base(
                         other_triangle_idx,
-                        value_at_point,
+                        function,
                         new_triangles,
                     )[other_edge_idx - 1]
                 }
@@ -397,6 +396,6 @@ mod test {
     fn from_points() {
         let x_points = vec![0., 1., 2.];
         let y_points = vec![0., 1., 2.];
-        ElementMesh::from_points((&x_points, &y_points), |_| 0.);
+        ElementMesh::from_points((&x_points, &y_points), &|_| 0.);
     }
 }

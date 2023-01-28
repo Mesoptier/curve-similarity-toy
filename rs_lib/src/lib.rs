@@ -287,9 +287,7 @@ impl Plotter {
             CurveDistFn::new([&self.curves[0], &self.curves[1]]);
 
         let mut element_mesh =
-            ElementMesh::from_points((&x_points, &y_points), |point| {
-                curve_dist_fn.eval(*point)
-            });
+            ElementMesh::from_points((&x_points, &y_points), &curve_dist_fn);
 
         // Get rough bounds on the values in the mesh
         let (min_value, max_value) = element_mesh
@@ -331,8 +329,7 @@ impl Plotter {
             })
         };
 
-        element_mesh
-            .refine(&|&p| curve_dist_fn.eval(p), should_refine_triangle);
+        element_mesh.refine(&curve_dist_fn, should_refine_triangle);
 
         // Build isoline data
         let mut isoline_vertex_data: Vec<Vertex<Dist>> = isoline_thresholds
