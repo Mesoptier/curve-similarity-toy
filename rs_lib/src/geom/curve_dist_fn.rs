@@ -23,7 +23,7 @@ impl<'f> CurveDistFn<'f> {
             self.curves[0].points().iter(),
             self.curves[1].points().iter(),
         )
-        .map(|(p1, p2)| (p1 - p2).magnitude_squared())
+        .map(|(p1, p2)| (p1 - p2).norm_squared())
         .fold(Dist::NEG_INFINITY, |max_dist, dist| max_dist.max(dist))
     }
 

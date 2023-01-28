@@ -201,7 +201,7 @@ impl<T: RealField + Copy, const D: usize> LineSegment<T, D> {
 
         let c0 = p0 + p1_sub_p0 * s;
         let c1 = q0 + q1_sub_q0 * t;
-        (c0 - c1).magnitude_squared()
+        (c0 - c1).norm_squared()
     }
 
     pub fn dist(&self, other: &Self) -> T {
