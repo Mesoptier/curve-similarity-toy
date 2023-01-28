@@ -1,9 +1,16 @@
-import { type Dispatch, type SetStateAction, useEffect, useState } from 'react';
+import {
+    type Dispatch,
+    type SetStateAction,
+    useEffect,
+    useMemo,
+    useState,
+} from 'react';
 
 import { JsCurve, Plotter } from '@rs_lib';
 
 const CURVE_OFFSET = 20;
 const PLOT_OFFSET = 40;
+const OVERFLOW_OFFSET = 20;
 
 interface ParamSpaceViewCanvasProps {
     containerSize: { width: number; height: number };
@@ -20,15 +27,20 @@ type ParamSpaceViewProps = Pick<
 >;
 
 function makeGridLines(xCoords: number[], yCoords: number[]): string {
+    const xMin = Math.round(xCoords[0]);
+    const xMax = Math.round(xCoords[xCoords.length - 1]);
+    const yMin = Math.round(yCoords[0]);
+    const yMax = Math.round(yCoords[yCoords.length - 1]);
+
     const verticalLines = xCoords
         .filter((_, index, array) => index !== 0 && index !== array.length - 1)
         .map((x) => Math.round(x - 0.5) + 0.5)
-        .map((x) => `M${x} 0V${Math.round(yCoords[yCoords.length - 1])}`)
+        .map((x) => `M${x} ${yMin}V${yMax}`)
         .join('');
     const horizontalLines = yCoords
         .filter((_, index, array) => index !== 0 && index !== array.length - 1)
         .map((y) => Math.round(y - 0.5) + 0.5)
-        .map((y) => `M0 ${y}H${Math.round(xCoords[xCoords.length - 1])}`)
+        .map((y) => `M${xMin} ${y}H${xMax}`)
         .join('');
     return verticalLines + horizontalLines;
 }
@@ -86,6 +98,22 @@ export function ParamSpaceView(props: ParamSpaceViewProps): JSX.Element {
     );
 }
 
+type Bounds = [min: number, max: number];
+
+function useComputeBounds(
+    cumulativeLengths: number[],
+    offset: number,
+    maxPlotLength: number,
+): Bounds {
+    const totalLength = cumulativeLengths[cumulativeLengths.length - 1];
+    const bounds: Bounds = [
+        Math.max(0, 0 - offset),
+        Math.min(totalLength, maxPlotLength - offset),
+    ];
+
+    return useMemo(() => bounds, bounds);
+}
+
 function ParamSpaceViewCanvas(props: ParamSpaceViewCanvasProps): JSX.Element {
     const {
         containerSize,
@@ -99,44 +127,54 @@ function ParamSpaceViewCanvas(props: ParamSpaceViewCanvasProps): JSX.Element {
         (curve) => curve.cumulative_lengths,
     );
 
-    const plotWidth = cumulativeLengths1[cumulativeLengths1.length - 1];
-    const plotHeight = cumulativeLengths2[cumulativeLengths2.length - 1];
+    const maxPlotWidth = Math.max(
+        0,
+        containerSize.width - (PLOT_OFFSET + CURVE_OFFSET),
+    );
+    const maxPlotHeight = Math.max(
+        0,
+        containerSize.height - (PLOT_OFFSET + CURVE_OFFSET),
+    );
+
+    const [xOffset] = useState(0);
+    const [yOffset] = useState(0);
+
+    const xBounds = useComputeBounds(cumulativeLengths1, xOffset, maxPlotWidth);
+    const yBounds = useComputeBounds(
+        cumulativeLengths2,
+        yOffset,
+        maxPlotHeight,
+    );
+
+    const plotWidth = xBounds[1] - xBounds[0];
+    const plotHeight = yBounds[1] - yBounds[0];
 
     return (
         <svg>
             <g transform={`translate(0, ${containerSize.height}) scale(1, -1)`}>
                 {/* Flattened curves along axes */}
-                {[
-                    cumulativeLengths1.map((x) => ({ x, y: 0 })),
-                    cumulativeLengths2.map((y) => ({ x: 0, y })),
-                ].map((coords, curveIdx) => (
-                    <g
-                        key={curveIdx}
-                        className="curve"
-                        data-curve-idx={curveIdx}
-                        transform={
-                            curveIdx === 0
-                                ? `translate(${PLOT_OFFSET}, ${CURVE_OFFSET})`
-                                : `translate(${CURVE_OFFSET}, ${PLOT_OFFSET})`
-                        }
-                    >
-                        <line
-                            className="curve__line"
-                            x1={0}
-                            y1={0}
-                            x2={coords[coords.length - 1].x}
-                            y2={coords[coords.length - 1].y}
-                        />
-                        {coords.map(({ x, y }, pointIdx) => (
-                            <circle
-                                key={pointIdx}
-                                className="curve__point"
-                                cx={x}
-                                cy={y}
-                            />
-                        ))}
-                    </g>
-                ))}
+                <g
+                    className="curve"
+                    data-curve-idx={0}
+                    transform={`translate(${PLOT_OFFSET}, ${CURVE_OFFSET})`}
+                >
+                    <CurveAxis
+                        cumulativeLengths={cumulativeLengths1}
+                        offset={xOffset}
+                        maxLength={maxPlotWidth}
+                    />
+                </g>
+                <g
+                    className="curve"
+                    data-curve-idx={1}
+                    transform={`translate(${CURVE_OFFSET}, ${PLOT_OFFSET}) rotate(90)`}
+                >
+                    <CurveAxis
+                        cumulativeLengths={cumulativeLengths2}
+                        offset={yOffset}
+                        maxLength={maxPlotHeight}
+                    />
+                </g>
 
                 {/* Plot canvas */}
                 <foreignObject
@@ -150,8 +188,8 @@ function ParamSpaceViewCanvas(props: ParamSpaceViewCanvasProps): JSX.Element {
                             e.currentTarget.getBoundingClientRect();
 
                         setHighlightLeash([
-                            e.clientX - x,
-                            height - (e.clientY - y),
+                            e.clientX - x - xOffset,
+                            height - (e.clientY - y) - yOffset,
                         ]);
                     }}
                     onMouseLeave={() => {
@@ -162,6 +200,8 @@ function ParamSpaceViewCanvas(props: ParamSpaceViewCanvasProps): JSX.Element {
                         curves={curves}
                         width={Math.round(plotWidth)}
                         height={Math.round(plotHeight)}
+                        xBounds={xBounds}
+                        yBounds={yBounds}
                         showMesh={showMesh}
                     />
                 </foreignObject>
@@ -174,8 +214,20 @@ function ParamSpaceViewCanvas(props: ParamSpaceViewCanvasProps): JSX.Element {
                     <path
                         className="grid-lines"
                         d={makeGridLines(
-                            cumulativeLengths1,
-                            cumulativeLengths2,
+                            cumulativeLengths1.map(
+                                (length) =>
+                                    Math.max(
+                                        xBounds[0],
+                                        Math.min(xBounds[1], length),
+                                    ) + xOffset,
+                            ),
+                            cumulativeLengths2.map(
+                                (length) =>
+                                    Math.max(
+                                        yBounds[0],
+                                        Math.min(yBounds[1], length),
+                                    ) + yOffset,
+                            ),
                         )}
                     />
                     {highlightLeash && (
@@ -183,30 +235,30 @@ function ParamSpaceViewCanvas(props: ParamSpaceViewCanvasProps): JSX.Element {
                             <line
                                 className="leash__line leash__line--dashed"
                                 x1={-(PLOT_OFFSET - CURVE_OFFSET)}
-                                y1={highlightLeash[1]}
-                                x2={highlightLeash[0]}
-                                y2={highlightLeash[1]}
+                                y1={highlightLeash[1] + yOffset}
+                                x2={highlightLeash[0] + xOffset}
+                                y2={highlightLeash[1] + yOffset}
                             />
                             <line
                                 className="leash__line leash__line--dashed"
-                                x1={highlightLeash[0]}
+                                x1={highlightLeash[0] + xOffset}
                                 y1={-(PLOT_OFFSET - CURVE_OFFSET)}
-                                x2={highlightLeash[0]}
-                                y2={highlightLeash[1]}
+                                x2={highlightLeash[0] + xOffset}
+                                y2={highlightLeash[1] + yOffset}
                             />
                             <circle
                                 className="leash__point"
-                                cx={highlightLeash[0]}
-                                cy={highlightLeash[1]}
+                                cx={highlightLeash[0] + xOffset}
+                                cy={highlightLeash[1] + yOffset}
                             />
                             <circle
                                 className="leash__point"
                                 cx={-(PLOT_OFFSET - CURVE_OFFSET)}
-                                cy={highlightLeash[1]}
+                                cy={highlightLeash[1] + yOffset}
                             />
                             <circle
                                 className="leash__point"
-                                cx={highlightLeash[0]}
+                                cx={highlightLeash[0] + xOffset}
                                 cy={-(PLOT_OFFSET - CURVE_OFFSET)}
                             />
                         </g>
@@ -214,6 +266,54 @@ function ParamSpaceViewCanvas(props: ParamSpaceViewCanvasProps): JSX.Element {
                 </g>
             </g>
         </svg>
+    );
+}
+
+interface CurveAxisProps {
+    cumulativeLengths: number[];
+    offset: number;
+    maxLength: number;
+}
+
+function CurveAxis(props: CurveAxisProps): JSX.Element {
+    const { cumulativeLengths, offset, maxLength } = props;
+    const totalLength = cumulativeLengths[cumulativeLengths.length - 1];
+
+    return (
+        <>
+            <line
+                className="curve__line curve__line--overflow"
+                x1={Math.max(offset, 0)}
+                x2={Math.max(offset, 0 - OVERFLOW_OFFSET)}
+                y1={0}
+                y2={0}
+            />
+            <line
+                className="curve__line"
+                x1={Math.max(offset, 0)}
+                x2={Math.min(offset + totalLength, maxLength)}
+                y1={0}
+                y2={0}
+            />
+            <line
+                className="curve__line curve__line--overflow"
+                x1={Math.min(offset + totalLength, maxLength)}
+                x2={Math.min(offset + totalLength, maxLength + OVERFLOW_OFFSET)}
+                y1={0}
+                y2={0}
+            />
+            {cumulativeLengths
+                .map((length) => offset + length)
+                .filter((length) => 0 <= length && length <= maxLength)
+                .map((length, idx) => (
+                    <circle
+                        key={idx}
+                        className="curve__point"
+                        cx={length}
+                        cy={0}
+                    />
+                ))}
+        </>
     );
 }
 
@@ -241,11 +341,13 @@ interface PlotProps {
     curves: [JsCurve, JsCurve];
     width: number;
     height: number;
+    xBounds: Bounds;
+    yBounds: Bounds;
     showMesh: boolean;
 }
 
 function Plot(props: PlotProps): JSX.Element {
-    const { curves, height, width, showMesh } = props;
+    const { curves, height, width, xBounds, yBounds, showMesh } = props;
 
     const [canvas, setCanvas] = useState<HTMLCanvasElement | null>(null);
     const [plotter, setPlotter] = useState<Plotter | null>(null);
@@ -271,8 +373,8 @@ function Plot(props: PlotProps): JSX.Element {
         plotter.update_curves(...curves);
         plotter.draw({
             show_mesh: showMesh,
-            x_bounds: [0, width],
-            y_bounds: [0, height],
+            x_bounds: xBounds,
+            y_bounds: yBounds,
             canvas_width: canvasWidth,
             canvas_height: canvasHeight,
             device_pixel_ratio: devicePixelRatio,
@@ -281,8 +383,8 @@ function Plot(props: PlotProps): JSX.Element {
         plotter,
         curves,
         showMesh,
-        width,
-        height,
+        xBounds,
+        yBounds,
         canvasWidth,
         canvasHeight,
         devicePixelRatio,

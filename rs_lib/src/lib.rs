@@ -2,6 +2,7 @@ use std::iter;
 use std::str::FromStr;
 
 use itertools::Itertools;
+use nalgebra::{vector, Matrix4, Translation2};
 use palette::{Pixel, Srgb};
 use serde::Deserialize;
 use wasm_bindgen::prelude::*;
@@ -440,21 +441,19 @@ impl Plotter {
         );
 
         // Upload transformation matrix
-        let max_x = self.curves[0].total_length();
-        let max_y = self.curves[1].total_length();
-
-        #[rustfmt::skip]
-        let transform: [f32; 16] = [
-            2.0 / max_x, 0.0, 0.0, -1.0,
-            0.0, 2.0 / max_y, 0.0, -1.0,
-            0.0, 0.0, 1.0, 0.0,
-            0.0, 0.0, 0.0, 1.0,
-        ];
+        let m = Matrix4::new_scaling(1.0)
+            .append_translation(&vector![-x_bounds[0], -y_bounds[0], 0.0])
+            .append_nonuniform_scaling(&vector![
+                2.0 / (x_bounds[1] - x_bounds[0]),
+                2.0 / (y_bounds[1] - y_bounds[0]),
+                1.0
+            ])
+            .append_translation(&vector![-1.0, -1.0, 0.0]);
 
         self.context.uniform_matrix4fv_with_f32_array(
             Some(&self.transform_uniform),
             false,
-            &transform,
+            m.transpose().data.as_slice(),
         );
 
         // TODO: Get gradient from CSS custom property, so it can change according to `prefers-color-scheme` media query

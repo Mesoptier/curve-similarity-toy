@@ -169,6 +169,11 @@ body {
         fill: none;
         stroke: var(--curve-color);
         stroke-width: 2;
+
+        &--overflow {
+            stroke-dasharray: 2 3;
+            stroke-dashoffset: 2;
+        }
     }
 
     &__point {
