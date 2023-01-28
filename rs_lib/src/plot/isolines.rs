@@ -11,7 +11,7 @@ pub fn analyze_triangle(
     let make_endpoint =
         |v1: &Vertex<Dist>, v2: &Vertex<Dist>| -> Vertex<Dist> {
             let t = threshold.inverse_mix(v1.value, v2.value);
-            v1.mix(*v2, t)
+            (*v1).mix(*v2, t)
         };
 
     match (
