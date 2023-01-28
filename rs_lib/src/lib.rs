@@ -283,21 +283,20 @@ impl Plotter {
             y_bounds,
         );
 
-        let mut min_v = f32::INFINITY;
-        let mut max_v = f32::NEG_INFINITY;
-
         let curve_dist_fn =
             CurveDistFn::new([&self.curves[0], &self.curves[1]]);
 
         let mut element_mesh =
             ElementMesh::from_points((&x_points, &y_points), |point| {
-                let value = curve_dist_fn.eval(*point);
+                curve_dist_fn.eval(*point)
+            });
 
-                // TODO: Should these just be properties on ElementMesh?
-                min_v = min_v.min(value);
-                max_v = max_v.max(value);
-
-                value
+        // Get rough bounds on the values in the mesh
+        let (min_value, max_value) = element_mesh
+            .vertices()
+            .iter()
+            .fold((Dist::INFINITY, Dist::NEG_INFINITY), |(min, max), v| {
+                (min.min(v.value), max.max(v.value))
             });
 
         let num_isolines = 10;
@@ -305,7 +304,7 @@ impl Plotter {
             .map(|w_idx| {
                 1. / ((num_isolines + 1) as Dist) * ((w_idx + 1) as Dist)
             })
-            .map(|w| min_v + (max_v - min_v) * w)
+            .map(|w| min_value + (max_value - min_value) * w)
             .collect_vec();
 
         let isoline_precision = 0.2;
@@ -442,8 +441,11 @@ impl Plotter {
         );
 
         // Upload min/max values range
-        self.context
-            .uniform2f(Some(&self.value_range_uniform), min_v, max_v);
+        self.context.uniform2f(
+            Some(&self.value_range_uniform),
+            min_value,
+            max_value,
+        );
 
         // Upload transformation matrix
         let max_x = self.curves[0].total_length();
