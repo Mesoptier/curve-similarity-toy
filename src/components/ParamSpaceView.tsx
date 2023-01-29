@@ -136,6 +136,7 @@ function ParamSpaceViewCanvas(props: ParamSpaceViewCanvasProps): JSX.Element {
         containerSize.height - (PLOT_OFFSET + CURVE_OFFSET),
     );
 
+    const [isDragging, setDragging] = useState(false);
     const [[xOffset, yOffset], setTranslation] = useState([0, 0]);
 
     const targetRef = useRef(null);
@@ -144,6 +145,11 @@ function ParamSpaceViewCanvas(props: ParamSpaceViewCanvasProps): JSX.Element {
         (state) => {
             const [xOffset, yOffset] = state.offset;
             setTranslation([xOffset, -yOffset]);
+            setDragging(state.dragging);
+
+            if (state.dragging) {
+                setHighlightLeash(null);
+            }
         },
         { target: targetRef },
     );
@@ -193,6 +199,10 @@ function ParamSpaceViewCanvas(props: ParamSpaceViewCanvasProps): JSX.Element {
                     width={Math.round(plotWidth)}
                     height={Math.round(plotHeight)}
                     onMouseMove={(e) => {
+                        if (isDragging) {
+                            return;
+                        }
+
                         const { x, y, height } =
                             e.currentTarget.getBoundingClientRect();
 
@@ -239,7 +249,7 @@ function ParamSpaceViewCanvas(props: ParamSpaceViewCanvasProps): JSX.Element {
                             ),
                         )}
                     />
-                    {highlightLeash && (
+                    {!isDragging && highlightLeash && (
                         <g className="leash">
                             <line
                                 className="leash__line leash__line--dashed"
