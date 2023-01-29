@@ -313,15 +313,28 @@ function CurveAxis(props: CurveAxisProps): JSX.Element {
             />
             {cumulativeLengths
                 .map((length) => offset + length)
-                .filter((length) => 0 <= length && length <= maxLength)
-                .map((length, idx) => (
-                    <circle
-                        key={idx}
-                        className="curve__point"
-                        cx={length}
-                        cy={0}
-                    />
-                ))}
+                .filter(
+                    (length) =>
+                        0 - OVERFLOW_OFFSET <= length &&
+                        length <= maxLength + OVERFLOW_OFFSET,
+                )
+                .map((length, idx) => {
+                    let scale = 1;
+                    if (length <= 0) {
+                        scale = 1 - (0 - length) / OVERFLOW_OFFSET;
+                    } else if (maxLength <= length) {
+                        scale = 1 - (length - maxLength) / OVERFLOW_OFFSET;
+                    }
+                    return (
+                        <circle
+                            key={idx}
+                            className="curve__point"
+                            cx={length}
+                            cy={0}
+                            style={{ '--scale': scale }}
+                        />
+                    );
+                })}
         </>
     );
 }

@@ -177,8 +177,10 @@ body {
     }
 
     &__point {
+        --scale: 1.0;
+
         fill: var(--curve-color);
-        r: 5;
+        r: calc(5 * var(--scale));
     }
 
     &__preview {
