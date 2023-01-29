@@ -286,6 +286,7 @@ impl Plotter {
 
         let curve_dist_fn =
             CurveDistFn::new([&self.curves[0], &self.curves[1]]);
+        let gradient_fn = curve_dist_fn.gradient();
 
         let min_value = curve_dist_fn.min_dist();
         let max_value = curve_dist_fn.max_dist();
@@ -308,10 +309,8 @@ impl Plotter {
                 isolines::analyze_triangle(triangle, threshold_value)
                     .map(|[v0, v1]| {
                         let should_refine_vertex = |v: Vertex<Dist>| {
-                            let gradient_magnitude = curve_dist_fn
-                                .gradient()
-                                .eval(v.point)
-                                .magnitude();
+                            let gradient_magnitude =
+                                gradient_fn.eval(v.point).magnitude();
                             let true_value = curve_dist_fn.eval(v.point);
                             let error = (v.value - true_value).abs();
                             error > isoline_precision * gradient_magnitude
