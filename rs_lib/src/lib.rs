@@ -2,7 +2,7 @@ use std::iter;
 use std::str::FromStr;
 
 use itertools::Itertools;
-use nalgebra::{vector, Matrix4, Translation2};
+use nalgebra::{vector, Matrix4};
 use palette::{Pixel, Srgb};
 use serde::Deserialize;
 use wasm_bindgen::prelude::*;
