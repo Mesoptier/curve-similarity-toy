@@ -348,34 +348,6 @@ impl Plotter {
             );
         }
 
-        // TODO: Remove gradient debugging code
-        let debug_gradients = true;
-        if debug_gradients {
-            for triangle in element_mesh.iter_triangle_vertices() {
-                for &threshold_value in &isoline_thresholds {
-                    if let Some([v0, v1]) =
-                        isolines::analyze_triangle(triangle, threshold_value)
-                    {
-                        for v in [v0, v1, v0.mix(v1, 0.5)] {
-                            let gradient =
-                                curve_dist_fn.gradient().eval(v.point);
-                            let true_value = curve_dist_fn.eval(v.point);
-                            let error = (v.value - true_value).abs();
-
-                            if error > isoline_precision * gradient.magnitude()
-                            {
-                                isoline_vertex_data.push(v);
-                                isoline_vertex_data.push(Vertex {
-                                    point: v.point + 10.0 * gradient,
-                                    ..v
-                                })
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
         fn upload_buffer_data<T>(
             context: &WebGl2RenderingContext,
             buffer: &WebGlBuffer,
