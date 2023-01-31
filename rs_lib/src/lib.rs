@@ -47,12 +47,10 @@ fn subdivide_lengths(
         return vec![];
     }
 
-    iter::once(*lengths.first().unwrap())
-        .chain(
-            lengths
-                .iter()
-                .tuple_windows::<(_, _)>()
-                .flat_map(|(l1, l2)| {
+    let lengths =
+        iter::once(*lengths.first().unwrap())
+            .chain(lengths.iter().tuple_windows::<(_, _)>().flat_map(
+                |(l1, l2)| {
                     // Note: since `num_subdivisions` is 0 if both lengths are equal, this
                     // effectively also deduplicates the lengths
                     let num_subdivisions = ((l2 - l1) / res).ceil() as usize;
@@ -60,11 +58,15 @@ fn subdivide_lengths(
                         let t = (i + 1) as Dist / (num_subdivisions as Dist);
                         l1 * (1. - t) + l2 * t
                     })
-                }),
-        )
-        .map(|length| length.clamp(min, max))
-        .dedup()
-        .collect()
+                },
+            ))
+            .collect_vec();
+
+    let lo = lengths.partition_point(|&length| length <= min).max(1) - 1;
+    let hi = lengths
+        .partition_point(|&length| length <= max)
+        .min(lengths.len() - 1);
+    lengths[lo..=hi].to_vec()
 }
 
 #[wasm_bindgen(typescript_custom_section)]
@@ -283,6 +285,10 @@ impl Plotter {
             res,
             y_bounds,
         );
+
+        if x_points.is_empty() || y_points.is_empty() {
+            return;
+        }
 
         let curve_dist_fn =
             CurveDistFn::new([&self.curves[0], &self.curves[1]]);
