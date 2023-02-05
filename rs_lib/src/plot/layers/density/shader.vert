@@ -23,15 +23,11 @@ vec3 color_map_get(float value) {
 }
 
 void main() {
-    if (a_value < 0.0) {
-        v_color = vec4(0.0, 0.0, 0.0, 0.5);
-    } else {
-        float min_value = u_value_range.x;
-        float max_value = u_value_range.y;
-        float value = (a_value - min_value) / (max_value - min_value);
-        vec3 color = color_map_get(value);
-        v_color = vec4(color, 1.0);
-    }
+    float min_value = u_value_range.x;
+    float max_value = u_value_range.y;
+    float value = (a_value - min_value) / (max_value - min_value);
+    vec3 color = color_map_get(value);
+    v_color = vec4(color, 1.0);
 
     gl_Position = a_position * u_transform;
 }
