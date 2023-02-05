@@ -129,6 +129,10 @@ impl Plotter {
     }
 
     pub fn draw(&self, options: IDrawOptions) {
+        self._draw(serde_wasm_bindgen::from_value(options.into()).unwrap())
+    }
+
+    fn _draw(&self, options: DrawOptions) {
         let DrawOptions {
             show_mesh,
             x_bounds,
@@ -137,7 +141,7 @@ impl Plotter {
             canvas_height,
             device_pixel_ratio,
             ..
-        } = serde_wasm_bindgen::from_value(options.into()).unwrap();
+        } = options;
 
         let context = &self.context;
 
@@ -233,6 +237,24 @@ impl Plotter {
                     .flat_map(|[v1, v2, v3]| [v1, v2, v2, v3, v3, v1])
                     .copied(),
             );
+        }
+
+        // TODO: Make this configurable?
+        let sharp_gradient = true;
+        let color_gradient = colorgrad::yl_gn_bu();
+
+        if sharp_gradient {
+            self.density_layer
+                .update_gradient_sharp(
+                    &context,
+                    color_gradient,
+                    num_isolines + 1,
+                )
+                .unwrap();
+        } else {
+            self.density_layer
+                .update_gradient_smooth(&context, color_gradient)
+                .unwrap();
         }
 
         self.density_layer
