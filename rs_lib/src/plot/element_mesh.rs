@@ -1,5 +1,6 @@
 use std::collections::VecDeque;
 
+use bytemuck::{Pod, Zeroable};
 use itertools::Itertools;
 use nalgebra::Point;
 
@@ -12,6 +13,9 @@ pub struct Vertex<Value> {
     pub point: Point<Dist, 2>,
     pub value: Value,
 }
+
+unsafe impl Zeroable for Vertex<Dist> {}
+unsafe impl Pod for Vertex<Dist> {}
 
 impl<Weight, Value> Mix<Weight> for Vertex<Value>
 where

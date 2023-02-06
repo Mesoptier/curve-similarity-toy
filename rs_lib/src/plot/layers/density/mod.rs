@@ -2,18 +2,19 @@ use colorgrad::Gradient;
 use itertools::Itertools;
 use nalgebra::Matrix4;
 use web_sys::{
-    WebGl2RenderingContext, WebGlBuffer, WebGlProgram, WebGlTexture,
-    WebGlUniformLocation, WebGlVertexArrayObject,
+    WebGl2RenderingContext, WebGlProgram, WebGlTexture, WebGlUniformLocation,
+    WebGlVertexArrayObject,
 };
 
 use crate::geom::Dist;
-use crate::plot::element_mesh::ElementMesh;
+use crate::plot::element_mesh::{ElementMesh, Vertex};
+use crate::webgl::buffer::{Buffer, BufferTarget, BufferUsage};
 use crate::{
-    compile_shader, link_program, upload_buffer_data, BYTES_PER_FLOAT,
-    FLOATS_PER_POSITION, FLOATS_PER_VALUE, FLOATS_PER_VERTEX,
+    compile_shader, link_program, BYTES_PER_FLOAT, FLOATS_PER_POSITION,
+    FLOATS_PER_VALUE, FLOATS_PER_VERTEX,
 };
 
-pub struct DensityLayer {
+pub struct DensityLayer<'a> {
     program: WebGlProgram,
 
     u_value_range: WebGlUniformLocation,
@@ -22,12 +23,12 @@ pub struct DensityLayer {
     gradient_texture: WebGlTexture,
 
     vao: WebGlVertexArrayObject,
-    array_buffer: WebGlBuffer,
-    element_array_buffer: WebGlBuffer,
+    vertex_buffer: Buffer<'a, Vertex<Dist>>,
+    index_buffer: Buffer<'a, u32>,
 }
 
-impl DensityLayer {
-    pub fn new(context: &WebGl2RenderingContext) -> Result<Self, String> {
+impl<'a> DensityLayer<'a> {
+    pub fn new(context: &'a WebGl2RenderingContext) -> Result<Self, String> {
         // Compiler shaders
         let vert_shader = compile_shader(
             context,
@@ -60,10 +61,18 @@ impl DensityLayer {
             .ok_or("Failed to get uniform location")?;
 
         // Create buffers
-        let array_buffer =
-            context.create_buffer().ok_or("Failed to create buffer")?;
-        let element_array_buffer =
-            context.create_buffer().ok_or("Failed to create buffer")?;
+        let vertex_buffer = Buffer::new(
+            context,
+            BufferTarget::ArrayBuffer,
+            BufferUsage::StaticDraw,
+        )
+        .map_err(|error| format!("{error:?}"))?;
+        let index_buffer = Buffer::new(
+            context,
+            BufferTarget::ElementArrayBuffer,
+            BufferUsage::StaticDraw,
+        )
+        .map_err(|error| format!("{error:?}"))?;
 
         // Setup vertex array object
         let vao = context
@@ -72,14 +81,8 @@ impl DensityLayer {
 
         context.bind_vertex_array(Some(&vao));
 
-        context.bind_buffer(
-            WebGl2RenderingContext::ARRAY_BUFFER,
-            Some(&array_buffer),
-        );
-        context.bind_buffer(
-            WebGl2RenderingContext::ELEMENT_ARRAY_BUFFER,
-            Some(&element_array_buffer),
-        );
+        vertex_buffer.bind();
+        index_buffer.bind();
 
         context.enable_vertex_attrib_array(a_position);
         context.vertex_attrib_pointer_with_i32(
@@ -116,8 +119,8 @@ impl DensityLayer {
             gradient_texture,
 
             vao,
-            array_buffer,
-            element_array_buffer,
+            vertex_buffer,
+            index_buffer,
         })
     }
 
@@ -225,27 +228,15 @@ impl DensityLayer {
 
         // Build vertex data
         let vertex_data = mesh.vertices();
-        let index_data = &mesh
+        let index_data: Vec<u32> = mesh
             .iter_triangle_elements()
             .flatten()
             .map(|idx| idx as u32)
             .collect();
 
         // Upload vertex data
-        upload_buffer_data(
-            context,
-            &self.array_buffer,
-            vertex_data,
-            WebGl2RenderingContext::ARRAY_BUFFER,
-            WebGl2RenderingContext::STATIC_DRAW,
-        );
-        upload_buffer_data(
-            context,
-            &self.element_array_buffer,
-            index_data,
-            WebGl2RenderingContext::ELEMENT_ARRAY_BUFFER,
-            WebGl2RenderingContext::STATIC_DRAW,
-        );
+        self.vertex_buffer.write(&vertex_data);
+        self.index_buffer.write(&index_data);
 
         // Bind gradient texture
         context.active_texture(WebGl2RenderingContext::TEXTURE0);

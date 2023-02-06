@@ -1,24 +1,26 @@
-use crate::geom::Dist;
-use crate::plot::element_mesh::Vertex;
-use crate::{
-    compile_shader, link_program, upload_buffer_data, BYTES_PER_FLOAT,
-    FLOATS_PER_POSITION, FLOATS_PER_VERTEX,
-};
 use nalgebra::Matrix4;
 use web_sys::{
-    WebGl2RenderingContext, WebGlBuffer, WebGlProgram, WebGlUniformLocation,
+    WebGl2RenderingContext, WebGlProgram, WebGlUniformLocation,
     WebGlVertexArrayObject,
 };
 
-pub struct ContourLinesLayer {
+use crate::geom::Dist;
+use crate::plot::element_mesh::Vertex;
+use crate::webgl::buffer::{Buffer, BufferTarget, BufferUsage};
+use crate::{
+    compile_shader, link_program, BYTES_PER_FLOAT, FLOATS_PER_POSITION,
+    FLOATS_PER_VERTEX,
+};
+
+pub struct ContourLinesLayer<'a> {
     program: WebGlProgram,
     u_transform: WebGlUniformLocation,
     vao: WebGlVertexArrayObject,
-    array_buffer: WebGlBuffer,
+    vertex_buffer: Buffer<'a, Vertex<Dist>>,
 }
 
-impl ContourLinesLayer {
-    pub fn new(context: &WebGl2RenderingContext) -> Result<Self, String> {
+impl<'a> ContourLinesLayer<'a> {
+    pub fn new(context: &'a WebGl2RenderingContext) -> Result<Self, String> {
         // Compiler shaders
         let vert_shader = compile_shader(
             context,
@@ -43,8 +45,12 @@ impl ContourLinesLayer {
             .ok_or("Failed to get uniform location")?;
 
         // Create buffers
-        let array_buffer =
-            context.create_buffer().ok_or("Failed to create buffer")?;
+        let vertex_buffer: Buffer<Vertex<Dist>> = Buffer::new(
+            context,
+            BufferTarget::ArrayBuffer,
+            BufferUsage::StaticDraw,
+        )
+        .map_err(|error| format!("{error:?}"))?;
 
         // Setup vertex array object
         let vao = context
@@ -53,10 +59,7 @@ impl ContourLinesLayer {
 
         context.bind_vertex_array(Some(&vao));
 
-        context.bind_buffer(
-            WebGl2RenderingContext::ARRAY_BUFFER,
-            Some(&array_buffer),
-        );
+        vertex_buffer.bind();
 
         context.enable_vertex_attrib_array(a_position);
         context.vertex_attrib_pointer_with_i32(
@@ -75,7 +78,7 @@ impl ContourLinesLayer {
             program,
             u_transform,
             vao,
-            array_buffer,
+            vertex_buffer,
         })
     }
 
@@ -99,13 +102,7 @@ impl ContourLinesLayer {
     ) -> Result<(), String> {
         context.use_program(Some(&self.program));
 
-        upload_buffer_data(
-            context,
-            &self.array_buffer,
-            &vertex_data,
-            WebGl2RenderingContext::ARRAY_BUFFER,
-            WebGl2RenderingContext::STATIC_DRAW,
-        );
+        self.vertex_buffer.write(&vertex_data);
 
         context.bind_vertex_array(Some(&self.vao));
         context.draw_arrays(

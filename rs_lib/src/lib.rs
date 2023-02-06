@@ -2,9 +2,10 @@ use std::iter;
 
 use itertools::Itertools;
 use nalgebra::{vector, Matrix4};
+use ouroboros::self_referencing;
 use serde::Deserialize;
 use wasm_bindgen::prelude::*;
-use web_sys::{WebGl2RenderingContext, WebGlBuffer, WebGlProgram, WebGlShader};
+use web_sys::{WebGl2RenderingContext, WebGlProgram, WebGlShader};
 
 use crate::geom::curve::Curve;
 use crate::geom::curve_dist_fn::CurveDistFn;
@@ -17,12 +18,12 @@ use crate::plot::isolines::BuildIsolines;
 use crate::plot::layers::contour_lines::ContourLinesLayer;
 use crate::plot::layers::density::DensityLayer;
 use crate::traits::mix::Mix;
-use crate::traits::vec_ext::VecExt;
 
 mod geom;
 mod math;
 mod plot;
 mod traits;
+mod webgl;
 
 #[macro_export]
 macro_rules! console_log {
@@ -94,13 +95,23 @@ struct DrawOptions {
     device_pixel_ratio: f32,
 }
 
+#[self_referencing]
+struct ContextWithLayers {
+    context: WebGl2RenderingContext,
+
+    #[borrows(context)]
+    #[covariant]
+    density_layer: DensityLayer<'this>,
+
+    #[borrows(context)]
+    #[covariant]
+    contour_lines_layer: ContourLinesLayer<'this>,
+}
+
 #[wasm_bindgen(getter_with_clone)]
 pub struct Plotter {
-    context: WebGl2RenderingContext,
     curves: [Curve; 2],
-
-    density_layer: DensityLayer,
-    contour_lines_layer: ContourLinesLayer,
+    context_with_layers: ContextWithLayers,
 }
 
 #[wasm_bindgen]
@@ -109,9 +120,6 @@ impl Plotter {
     pub fn new(context: &WebGl2RenderingContext) -> Result<Plotter, JsValue> {
         let context = context.clone();
 
-        let density_layer = DensityLayer::new(&context)?;
-        let contour_lines_layer = ContourLinesLayer::new(&context)?;
-
         // Enable blending
         context.enable(WebGl2RenderingContext::BLEND);
         context.blend_func(
@@ -119,12 +127,18 @@ impl Plotter {
             WebGl2RenderingContext::ONE_MINUS_SRC_ALPHA,
         );
 
-        Ok(Self {
+        let context_with_layers = ContextWithLayersTryBuilder {
             context,
-            curves: [Curve::default(), Curve::default()],
+            density_layer_builder: |context| DensityLayer::new(context),
+            contour_lines_layer_builder: |context| {
+                ContourLinesLayer::new(context)
+            },
+        }
+        .try_build()?;
 
-            density_layer,
-            contour_lines_layer,
+        Ok(Self {
+            curves: [Curve::default(), Curve::default()],
+            context_with_layers,
         })
     }
 
@@ -143,7 +157,7 @@ impl Plotter {
             ..
         } = options;
 
-        let context = &self.context;
+        let context = self.context_with_layers.borrow_context();
 
         context.viewport(0, 0, canvas_width, canvas_height);
 
@@ -239,12 +253,16 @@ impl Plotter {
             );
         }
 
+        let density_layer = self.context_with_layers.borrow_density_layer();
+        let contour_lines_layer =
+            self.context_with_layers.borrow_contour_lines_layer();
+
         // TODO: Make this configurable?
         let sharp_gradient = true;
         let color_gradient = colorgrad::yl_gn_bu();
 
         if sharp_gradient {
-            self.density_layer
+            density_layer
                 .update_gradient_sharp(
                     &context,
                     color_gradient,
@@ -252,13 +270,12 @@ impl Plotter {
                 )
                 .unwrap();
         } else {
-            self.density_layer
+            density_layer
                 .update_gradient_smooth(&context, color_gradient)
                 .unwrap();
         }
 
-        self.density_layer
-            .update_value_range(&context, [min_value, max_value]);
+        density_layer.update_value_range(&context, [min_value, max_value]);
 
         // Upload transformation matrix
         let m = Matrix4::new_scaling(1.0)
@@ -270,15 +287,15 @@ impl Plotter {
             ])
             .append_translation(&vector![-1.0, -1.0, 0.0]);
 
-        self.density_layer.update_transform(&context, m);
-        self.contour_lines_layer.update_transform(&context, m);
+        density_layer.update_transform(&context, m);
+        contour_lines_layer.update_transform(&context, m);
 
         // Draw
         context.clear_color(0.0, 0.0, 0.0, 1.0);
         context.clear(WebGl2RenderingContext::COLOR_BUFFER_BIT);
 
-        self.density_layer.draw(&context, &element_mesh).unwrap();
-        self.contour_lines_layer
+        density_layer.draw(&context, &element_mesh).unwrap();
+        contour_lines_layer
             .draw(&context, isoline_vertex_data)
             .unwrap();
     }
@@ -335,28 +352,5 @@ fn link_program(
         Err(context
             .get_program_info_log(&program)
             .unwrap_or_else(|| "Unknown error linking program".to_string()))
-    }
-}
-
-fn upload_buffer_data<T>(
-    context: &WebGl2RenderingContext,
-    buffer: &WebGlBuffer,
-    src_data: &Vec<T>,
-    target: u32,
-    usage: u32,
-) {
-    context.bind_buffer(target, Some(&buffer));
-    unsafe {
-        // SAFETY: We're creating a view directly into memory, which might
-        // become invalid if we're doing any allocations after this. The
-        // view is used immediately to copy data into a GPU buffer, after
-        // which it is discarded.
-        let array_buffer_view =
-            js_sys::Uint8Array::view(src_data.as_u8_slice());
-        context.buffer_data_with_array_buffer_view(
-            target,
-            &array_buffer_view,
-            usage,
-        );
     }
 }
