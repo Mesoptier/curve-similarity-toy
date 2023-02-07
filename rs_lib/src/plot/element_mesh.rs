@@ -5,7 +5,8 @@ use itertools::Itertools;
 use nalgebra::Point;
 
 use crate::math::function::Function;
-use crate::{geom::Dist, traits::mix::Mix};
+use crate::webgl::vertex::VertexFormat;
+use crate::{geom::Dist, traits::mix::Mix, webgl};
 
 #[derive(Clone, Copy, Debug)]
 #[repr(C)]
@@ -16,6 +17,12 @@ pub struct Vertex<Value> {
 
 unsafe impl Zeroable for Vertex<Dist> {}
 unsafe impl Pod for Vertex<Dist> {}
+
+unsafe impl webgl::vertex::Vertex for Vertex<Dist> {
+    fn build_bindings() -> VertexFormat {
+        todo!()
+    }
+}
 
 impl<Weight, Value> Mix<Weight> for Vertex<Value>
 where

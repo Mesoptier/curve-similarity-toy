@@ -7,6 +7,7 @@ use web_sys::{
 use crate::geom::Dist;
 use crate::plot::element_mesh::Vertex;
 use crate::webgl::buffer::{Buffer, BufferTarget, BufferUsage};
+use crate::webgl::vertex_buffer::VertexBuffer;
 use crate::{
     compile_shader, link_program, BYTES_PER_FLOAT, FLOATS_PER_POSITION,
     FLOATS_PER_VERTEX,
@@ -16,7 +17,7 @@ pub struct ContourLinesLayer<'a> {
     program: WebGlProgram,
     u_transform: WebGlUniformLocation,
     vao: WebGlVertexArrayObject,
-    vertex_buffer: Buffer<'a, Vertex<Dist>>,
+    vertex_buffer: VertexBuffer<'a, Vertex<Dist>>,
 }
 
 impl<'a> ContourLinesLayer<'a> {
@@ -45,12 +46,13 @@ impl<'a> ContourLinesLayer<'a> {
             .ok_or("Failed to get uniform location")?;
 
         // Create buffers
-        let vertex_buffer: Buffer<Vertex<Dist>> = Buffer::new(
+        let vertex_buffer: VertexBuffer<Vertex<Dist>> = Buffer::new(
             context,
             BufferTarget::ArrayBuffer,
             BufferUsage::StaticDraw,
         )
-        .map_err(|error| format!("{error:?}"))?;
+        .map_err(|error| format!("{error:?}"))?
+        .into();
 
         // Setup vertex array object
         let vao = context

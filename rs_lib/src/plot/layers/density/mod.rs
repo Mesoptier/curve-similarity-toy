@@ -9,6 +9,8 @@ use web_sys::{
 use crate::geom::Dist;
 use crate::plot::element_mesh::{ElementMesh, Vertex};
 use crate::webgl::buffer::{Buffer, BufferTarget, BufferUsage};
+use crate::webgl::index_buffer::IndexBuffer;
+use crate::webgl::vertex_buffer::VertexBuffer;
 use crate::{
     compile_shader, link_program, BYTES_PER_FLOAT, FLOATS_PER_POSITION,
     FLOATS_PER_VALUE, FLOATS_PER_VERTEX,
@@ -23,8 +25,8 @@ pub struct DensityLayer<'a> {
     gradient_texture: WebGlTexture,
 
     vao: WebGlVertexArrayObject,
-    vertex_buffer: Buffer<'a, Vertex<Dist>>,
-    index_buffer: Buffer<'a, u32>,
+    vertex_buffer: VertexBuffer<'a, Vertex<Dist>>,
+    index_buffer: IndexBuffer<'a, u32>,
 }
 
 impl<'a> DensityLayer<'a> {
@@ -61,18 +63,20 @@ impl<'a> DensityLayer<'a> {
             .ok_or("Failed to get uniform location")?;
 
         // Create buffers
-        let vertex_buffer = Buffer::new(
+        let vertex_buffer: VertexBuffer<Vertex<Dist>> = Buffer::new(
             context,
             BufferTarget::ArrayBuffer,
             BufferUsage::StaticDraw,
         )
-        .map_err(|error| format!("{error:?}"))?;
-        let index_buffer = Buffer::new(
+        .map_err(|error| format!("{error:?}"))?
+        .into();
+        let index_buffer: IndexBuffer<u32> = Buffer::new(
             context,
             BufferTarget::ElementArrayBuffer,
             BufferUsage::StaticDraw,
         )
-        .map_err(|error| format!("{error:?}"))?;
+        .map_err(|error| format!("{error:?}"))?
+        .into();
 
         // Setup vertex array object
         let vao = context
