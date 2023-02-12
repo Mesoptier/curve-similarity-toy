@@ -10,12 +10,15 @@ import {
 import { JsCurve, Plotter } from '@rs_lib';
 import { useDrag } from '@use-gesture/react';
 
+import { useBoundingClientRect } from '../hooks/useBoundingClientRect';
+
 const CURVE_OFFSET = 20;
 const PLOT_OFFSET = 40;
 const OVERFLOW_OFFSET = 20;
 
 interface ParamSpaceViewCanvasProps {
-    containerSize: { width: number; height: number };
+    width: number;
+    height: number;
     showMesh: boolean;
 
     curves: [JsCurve, JsCurve];
@@ -52,26 +55,9 @@ export function ParamSpaceView(props: ParamSpaceViewProps): JSX.Element {
 
     const [showMesh, setShowMesh] = useState(false);
 
-    const [container, setContainer] = useState<HTMLElement | null>(null);
-    const [containerSize, setContainerSize] = useState<{
-        width: number;
-        height: number;
-    }>({ width: 0, height: 0 });
-
-    useEffect(() => {
-        if (container === null) {
-            return;
-        }
-
-        const observer = new ResizeObserver((entries) => {
-            const { width, height } = entries[0].contentRect;
-            setContainerSize({ width, height });
-        });
-        observer.observe(container, { box: 'border-box' });
-        return () => {
-            observer.disconnect();
-        };
-    }, [container]);
+    const [containerElement, setContainerElement] =
+        useState<HTMLElement | null>(null);
+    const containerRect = useBoundingClientRect(containerElement);
 
     return (
         <div className="space-view">
@@ -86,10 +72,11 @@ export function ParamSpaceView(props: ParamSpaceViewProps): JSX.Element {
                     Show mesh
                 </label>
             </header>
-            <div ref={setContainer} className="space-view__canvas">
-                {curves.every((curve) => curve.points.length > 1) && (
+            <div ref={setContainerElement} className="space-view__canvas">
+                {containerRect && curves.every((curve) => curve.points.length > 1) && (
                     <ParamSpaceViewCanvas
-                        containerSize={containerSize}
+                        width={containerRect.width}
+                        height={containerRect.height}
                         curves={curves}
                         showMesh={showMesh}
                         {...otherProps}
@@ -116,7 +103,8 @@ function useComputeBounds(
 
 function ParamSpaceViewCanvas(props: ParamSpaceViewCanvasProps): JSX.Element {
     const {
-        containerSize,
+        width,
+        height,
         showMesh,
         curves,
         highlightLeash,
@@ -129,11 +117,11 @@ function ParamSpaceViewCanvas(props: ParamSpaceViewCanvasProps): JSX.Element {
 
     const maxPlotWidth = Math.max(
         0,
-        containerSize.width - (PLOT_OFFSET + CURVE_OFFSET),
+        width - (PLOT_OFFSET + CURVE_OFFSET),
     );
     const maxPlotHeight = Math.max(
         0,
-        containerSize.height - (PLOT_OFFSET + CURVE_OFFSET),
+        height - (PLOT_OFFSET + CURVE_OFFSET),
     );
 
     const [isDragging, setDragging] = useState(false);
@@ -166,7 +154,7 @@ function ParamSpaceViewCanvas(props: ParamSpaceViewCanvasProps): JSX.Element {
 
     return (
         <svg ref={targetRef} style={{ touchAction: 'none' }}>
-            <g transform={`translate(0, ${containerSize.height}) scale(1, -1)`}>
+            <g transform={`translate(0, ${height}) scale(1, -1)`}>
                 {/* Flattened curves along axes */}
                 <g
                     className="curve"
