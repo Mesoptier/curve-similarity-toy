@@ -28,7 +28,7 @@
   },
   "dependencies": {
     "@use-gesture/react": "^10.2.24",
-    "mafs": "portal:./../mafs",
+    "mafs": "file:./mafs-0.15.2.tgz",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
   }
