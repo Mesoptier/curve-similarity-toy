@@ -1,6 +1,6 @@
 {
   "name": "curve-similarity-toy",
-  "packageManager": "yarn@3.3.0",
+  "packageManager": "yarn@3.4.1",
   "scripts": {
     "build:wasm": "cross-env WASM_BINDGEN_WEAKREF=1 wasm-pack build rs_lib --target web",
     "build:wasm:dev": "yarn build:wasm --dev",
