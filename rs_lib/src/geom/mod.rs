@@ -49,6 +49,14 @@ impl JsCurve {
         new_self
     }
 
+    pub fn with_replaced_point(&self, point_idx: usize, point: IPoint) -> Self {
+        let point = serde_wasm_bindgen::from_value(point.into()).unwrap();
+
+        let mut new_points = self.0.points().clone();
+        new_points[point_idx] = point;
+        Self(Curve::from_points(new_points))
+    }
+
     pub fn at(&self, length: Dist) -> IPoint {
         serde_wasm_bindgen::to_value(&self.0.eval(length))
             .unwrap()
