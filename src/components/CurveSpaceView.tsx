@@ -53,7 +53,23 @@ function CurveSpaceViewCanvas(props: CurveSpaceViewCanvasProps): JSX.Element {
     const { width, height, curves, updateCurves, highlightLeash } = props;
 
     return (
-        <Mafs width={width} height={height} zoom>
+        <Mafs
+            width={width}
+            height={height}
+            zoom
+            onClick={(newPoint, event) => {
+                if ((event.target as Element).closest('.mafs-movable-point')) {
+                    return;
+                }
+
+                const curveIdx = event.ctrlKey ? 1 : 0;
+                updateCurves((curves) => {
+                    curves = [...curves];
+                    curves[curveIdx] = curves[curveIdx].with_point(newPoint);
+                    return curves;
+                });
+            }}
+        >
             <Coordinates.Cartesian />
             {curves.map((curve, curveIdx) => (
                 <Polyline
