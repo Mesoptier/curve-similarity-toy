@@ -2,7 +2,9 @@ import {
     type Dispatch,
     type SetStateAction,
     useEffect,
+    useLayoutEffect,
     useMemo,
+    useRef,
     useState,
 } from 'react';
 import {
@@ -83,7 +85,7 @@ function ParamSpaceViewCanvas(props: ParamSpaceViewCanvasProps): JSX.Element {
     ) as [number, number];
 
     return (
-        <Mafs width={width} height={height}>
+        <Mafs width={width} height={height} zoom>
             <Coordinates.Cartesian />
             <HeightPlot
                 curves={curves}
@@ -131,32 +133,26 @@ function HeightPlot(props: HeightPlotProps) {
         vec.transform(vec.transform(point, userTransform), viewTransform),
     );
 
+    const drawX = drawRange[0][0];
+    const drawY = drawRange[0][1];
     const drawWidth = drawRange[1][0] - drawRange[0][0];
     const drawHeight = drawRange[1][1] - drawRange[0][1];
     const canvasWidth = canvasRange[1][0] - canvasRange[0][0];
     const canvasHeight = canvasRange[1][1] - canvasRange[0][1];
 
     return (
-        <>
-            <foreignObject
-                x={drawRange[0][0]}
-                y={drawRange[0][1]}
-                width={drawWidth}
-                height={drawHeight}
-                style={{ outline: '1px solid red' }}
-            >
-                <HeightPlotCanvas
-                    curves={curves}
-                    drawWidth={drawWidth}
-                    drawHeight={drawHeight}
-                    canvasWidth={canvasWidth}
-                    canvasHeight={canvasHeight}
-                    xBounds={xRange}
-                    yBounds={yRange}
-                    showMesh={showMesh}
-                />
-            </foreignObject>
-        </>
+        <HeightPlotCanvas
+            curves={curves}
+            drawX={drawX}
+            drawY={drawY}
+            drawWidth={drawWidth}
+            drawHeight={drawHeight}
+            canvasWidth={canvasWidth}
+            canvasHeight={canvasHeight}
+            xBounds={xRange}
+            yBounds={yRange}
+            showMesh={showMesh}
+        />
     );
 }
 
@@ -182,6 +178,8 @@ function useDevicePixelRatio(): number {
 
 interface HeightPlotCanvasProps {
     curves: [JsCurve, JsCurve];
+    drawX: number;
+    drawY: number;
     drawWidth: number;
     drawHeight: number;
     canvasWidth: number;
@@ -194,6 +192,8 @@ interface HeightPlotCanvasProps {
 function HeightPlotCanvas(props: HeightPlotCanvasProps): JSX.Element {
     const {
         curves,
+        drawX,
+        drawY,
         drawWidth,
         drawHeight,
         canvasWidth,
@@ -203,16 +203,11 @@ function HeightPlotCanvas(props: HeightPlotCanvasProps): JSX.Element {
         showMesh,
     } = props;
 
+    const foreignObject = useRef<SVGForeignObjectElement>(null);
     const [canvas, setCanvas] = useState<HTMLCanvasElement | null>(null);
     const [plotter, setPlotter] = useState<Plotter | null>(null);
 
     const devicePixelRatio = useDevicePixelRatio();
-
-    const scaledDrawWidth = Math.round(drawWidth * devicePixelRatio);
-    const scaledDrawHeight = Math.round(drawHeight * devicePixelRatio);
-
-    const scaledCanvasWidth = Math.round(canvasWidth * devicePixelRatio);
-    const scaledCanvasHeight = Math.round(canvasHeight * devicePixelRatio);
 
     useEffect(() => {
         if (canvas === null) {
@@ -223,12 +218,19 @@ function HeightPlotCanvas(props: HeightPlotCanvasProps): JSX.Element {
         setPlotter(new Plotter(ctx));
     }, [canvas]);
 
-    useEffect(() => {
+    useLayoutEffect(() => {
         if (plotter === null) {
             return;
         }
 
-        // TODO: Only update canvas dimensions right before drawing, to avoid a flash of blank canvas
+        const scaledDrawWidth = Math.round(drawWidth * devicePixelRatio);
+        const scaledDrawHeight = Math.round(drawHeight * devicePixelRatio);
+
+        const scaledCanvasWidth = Math.round(canvasWidth * devicePixelRatio);
+        const scaledCanvasHeight = Math.round(canvasHeight * devicePixelRatio);
+
+        canvas.width = scaledCanvasWidth;
+        canvas.height = scaledCanvasHeight;
 
         plotter.update_curves(...curves);
         plotter.draw({
@@ -241,28 +243,32 @@ function HeightPlotCanvas(props: HeightPlotCanvasProps): JSX.Element {
             canvas_height: scaledCanvasHeight,
             device_pixel_ratio: devicePixelRatio,
         });
+
+        foreignObject.current.setAttribute('x', `${drawX}`);
+        foreignObject.current.setAttribute('y', `${drawY}`);
+        foreignObject.current.setAttribute('width', `${drawWidth}`);
+        foreignObject.current.setAttribute('height', `${drawHeight}`);
+
+        canvas.style.width = `${canvasWidth}px`;
+        canvas.style.height = `${canvasHeight}px`;
     }, [
         plotter,
         curves,
         showMesh,
         xBounds,
         yBounds,
-        scaledDrawWidth,
-        scaledDrawHeight,
-        scaledCanvasWidth,
-        scaledCanvasHeight,
+        drawX,
+        drawY,
+        drawWidth,
+        drawHeight,
+        canvasWidth,
+        canvasHeight,
         devicePixelRatio,
     ]);
 
     return (
-        <canvas
-            ref={setCanvas}
-            width={scaledCanvasWidth}
-            height={scaledCanvasHeight}
-            style={{
-                width: `${canvasWidth}px`,
-                height: `${canvasHeight}px`,
-            }}
-        />
+        <foreignObject ref={foreignObject}>
+            <canvas ref={setCanvas} />
+        </foreignObject>
     );
 }
