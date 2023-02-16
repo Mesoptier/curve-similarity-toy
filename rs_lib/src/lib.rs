@@ -73,6 +73,8 @@ export type IDrawOptions = {
     show_mesh: boolean;
     x_bounds: [min: number, max: number];
     y_bounds: [min: number, max: number];
+    draw_width: number;
+    draw_height: number;
     canvas_width: number;
     canvas_height: number;
     device_pixel_ratio: number;
@@ -90,6 +92,8 @@ struct DrawOptions {
     show_mesh: bool,
     x_bounds: [f32; 2],
     y_bounds: [f32; 2],
+    draw_width: i32,
+    draw_height: i32,
     canvas_width: i32,
     canvas_height: i32,
     device_pixel_ratio: f32,
@@ -151,6 +155,8 @@ impl Plotter {
             show_mesh,
             x_bounds,
             y_bounds,
+            draw_width,
+            draw_height,
             canvas_width,
             canvas_height,
             device_pixel_ratio,
@@ -159,7 +165,7 @@ impl Plotter {
 
         let context = self.context_with_layers.borrow_context();
 
-        context.viewport(0, 0, canvas_width, canvas_height);
+        context.viewport(0, canvas_height - draw_height, draw_width, draw_height);
 
         if let Ok(range) = context
             .get_parameter(WebGl2RenderingContext::ALIASED_LINE_WIDTH_RANGE)
