@@ -11,7 +11,10 @@ import {
 import {
     Coordinates,
     Interval,
+    Line,
     Mafs,
+    MovablePoint,
+    Theme,
     usePaneContext,
     useTransformContext,
     vec,
@@ -76,7 +79,14 @@ export function ParamSpaceView(props: ParamSpaceViewProps): JSX.Element {
 }
 
 function ParamSpaceViewCanvas(props: ParamSpaceViewCanvasProps): JSX.Element {
-    const { width, height, curves, showMesh } = props;
+    const {
+        width,
+        height,
+        curves,
+        showMesh,
+        highlightLeash,
+        setHighlightLeash,
+    } = props;
 
     const cumulativeLengths = curves.map(
         (curve) => curve.cumulative_lengths,
@@ -85,14 +95,45 @@ function ParamSpaceViewCanvas(props: ParamSpaceViewCanvasProps): JSX.Element {
         (lengths) => lengths[lengths.length - 1],
     ) as [number, number];
 
+    const setHighlightLeashClamped = (point) => {
+        setHighlightLeash([
+            Math.max(0, Math.min(totalLengths[0], point[0])),
+            Math.max(0, Math.min(totalLengths[1], point[1])),
+        ]);
+    };
+
     return (
-        <Mafs width={width} height={height} zoom>
+        <Mafs
+            width={width}
+            height={height}
+            zoom
+            onClick={(point) => setHighlightLeashClamped(point)}
+        >
             <Coordinates.Cartesian />
             <HeightPlot
                 curves={curves}
                 totalLengths={totalLengths}
                 showMesh={showMesh}
             />
+            {highlightLeash && (
+                <>
+                    <Line.Segment
+                        point1={[0, highlightLeash[1]]}
+                        point2={highlightLeash}
+                        color={Theme.pink}
+                    />
+                    <Line.Segment
+                        point1={[highlightLeash[0], 0]}
+                        point2={highlightLeash}
+                        color={Theme.pink}
+                    />
+                    <MovablePoint
+                        color={Theme.pink}
+                        point={highlightLeash}
+                        onMove={(point) => setHighlightLeashClamped(point)}
+                    />
+                </>
+            )}
         </Mafs>
     );
 }

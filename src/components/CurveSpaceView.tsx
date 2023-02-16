@@ -75,7 +75,7 @@ function CurveSpaceViewCanvas(props: CurveSpaceViewCanvasProps): JSX.Element {
                 <Polyline
                     key={curveIdx}
                     points={curve.points}
-                    color={curveIdx === 0 ? Theme.blue : Theme.red}
+                    color={curveIdx === 0 ? Theme.blue : Theme.green}
                 />
             ))}
             {curves.map((curve, curveIdx) =>
@@ -92,7 +92,7 @@ function CurveSpaceViewCanvas(props: CurveSpaceViewCanvasProps): JSX.Element {
                                 return curves;
                             });
                         }}
-                        color={curveIdx === 0 ? Theme.blue : Theme.red}
+                        color={curveIdx === 0 ? Theme.blue : Theme.green}
                     />
                 )),
             )}
@@ -120,10 +120,10 @@ function LeashPreview(props: LeashPreviewProps): JSX.Element {
             <Line.Segment
                 point1={points[0]}
                 point2={points[1]}
-                color={Theme.green}
+                color={Theme.pink}
             />
             {points.map(([x, y], curveIdx) => (
-                <Point key={curveIdx} x={x} y={y} color={Theme.green} />
+                <Point key={curveIdx} x={x} y={y} color={Theme.pink} />
             ))}
         </>
     );
