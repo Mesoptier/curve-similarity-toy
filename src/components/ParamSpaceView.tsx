@@ -1,6 +1,7 @@
 import {
     type Dispatch,
     type SetStateAction,
+    useCallback,
     useEffect,
     useLayoutEffect,
     useMemo,
@@ -9,6 +10,7 @@ import {
 } from 'react';
 import {
     Coordinates,
+    Interval,
     Mafs,
     usePaneContext,
     useTransformContext,
@@ -18,6 +20,7 @@ import {
 import { ILengths, JsCurve, Plotter } from '@rs_lib';
 
 import { useBoundingClientRect } from '../hooks/useBoundingClientRect';
+import { useDevicePixelRatio } from '../hooks/useDevicePixelRatio';
 
 interface ParamSpaceViewCanvasProps {
     width: number;
@@ -72,8 +75,6 @@ export function ParamSpaceView(props: ParamSpaceViewProps): JSX.Element {
     );
 }
 
-type Bounds = [min: number, max: number];
-
 function ParamSpaceViewCanvas(props: ParamSpaceViewCanvasProps): JSX.Element {
     const { width, height, curves, showMesh } = props;
 
@@ -96,6 +97,32 @@ function ParamSpaceViewCanvas(props: ParamSpaceViewCanvasProps): JSX.Element {
     );
 }
 
+function useClampedRange(range: Interval, clamp: Interval): Interval {
+    const clampedRange: Interval = [
+        Math.max(range[0], clamp[0]),
+        Math.min(range[1], clamp[1]),
+    ];
+    return useMemo(() => clampedRange, clampedRange);
+}
+
+function useScale(): vec.Vector2 {
+    const { userTransform, viewTransform } = useTransformContext();
+    const scale: vec.Vector2 = [
+        Math.abs(viewTransform[0]) * Math.abs(userTransform[0]),
+        Math.abs(viewTransform[4]) * Math.abs(userTransform[4]),
+    ];
+    return useMemo(() => scale, scale);
+}
+
+function useTransformPoint(): (point: vec.Vector2) => vec.Vector2 {
+    const { userTransform, viewTransform } = useTransformContext();
+    return useCallback(
+        (point: vec.Vector2) =>
+            vec.transform(vec.transform(point, userTransform), viewTransform),
+        [userTransform, viewTransform],
+    );
+}
+
 interface HeightPlotProps {
     curves: [JsCurve, JsCurve];
     totalLengths: [number, number];
@@ -105,121 +132,45 @@ interface HeightPlotProps {
 function HeightPlot(props: HeightPlotProps) {
     const { curves, totalLengths, showMesh } = props;
 
-    const { userTransform, viewTransform } = useTransformContext();
-
-    const scaleX = Math.abs(viewTransform[0]) * Math.abs(userTransform[0]);
-    const scaleY = Math.abs(viewTransform[4]) * Math.abs(userTransform[4]);
-
-    const { xPaneRange, yPaneRange } = usePaneContext();
-    const xRangeUnmemoized = [
-        Math.max(0, xPaneRange[0]),
-        Math.min(totalLengths[0], xPaneRange[1]),
-    ] as Bounds;
-    const yRangeUnmemoized = [
-        Math.max(0, yPaneRange[0]),
-        Math.min(totalLengths[1], yPaneRange[1]),
-    ] as Bounds;
-
-    const xRange = useMemo(() => xRangeUnmemoized, xRangeUnmemoized);
-    const yRange = useMemo(() => yRangeUnmemoized, yRangeUnmemoized);
-
-    const drawRange = [
-        [xRange[0], yRange[1]] as vec.Vector2,
-        [xRange[1], yRange[0]] as vec.Vector2,
-    ].map((point) =>
-        vec.transform(vec.transform(point, userTransform), viewTransform),
-    );
-    const canvasRange = [
-        [xRange[0], yPaneRange[1]] as vec.Vector2,
-        [xPaneRange[1], yRange[0]] as vec.Vector2,
-    ].map((point) =>
-        vec.transform(vec.transform(point, userTransform), viewTransform),
-    );
-
-    const drawX = drawRange[0][0];
-    const drawY = drawRange[0][1];
-    const drawWidth = drawRange[1][0] - drawRange[0][0];
-    const drawHeight = drawRange[1][1] - drawRange[0][1];
-    const canvasWidth = canvasRange[1][0] - canvasRange[0][0];
-    const canvasHeight = canvasRange[1][1] - canvasRange[0][1];
-
-    return (
-        <HeightPlotCanvas
-            curves={curves}
-            drawX={drawX}
-            drawY={drawY}
-            drawWidth={drawWidth}
-            drawHeight={drawHeight}
-            canvasWidth={canvasWidth}
-            canvasHeight={canvasHeight}
-            xBounds={xRange}
-            yBounds={yRange}
-            scaleX={scaleX}
-            scaleY={scaleY}
-            showMesh={showMesh}
-        />
-    );
-}
-
-function useDevicePixelRatio(): number {
-    const [devicePixelRatio, setDevicePixelRatio] = useState(
-        window.devicePixelRatio,
-    );
-    useEffect(() => {
-        const media = window.matchMedia(
-            `(resolution: ${devicePixelRatio}dppx)`,
-        );
-        const handleChange = () => {
-            setDevicePixelRatio(window.devicePixelRatio);
-        };
-
-        media.addEventListener('change', handleChange);
-        return () => {
-            media.removeEventListener('change', handleChange);
-        };
-    }, [devicePixelRatio]);
-    return devicePixelRatio;
-}
-
-interface HeightPlotCanvasProps {
-    curves: [JsCurve, JsCurve];
-    drawX: number;
-    drawY: number;
-    drawWidth: number;
-    drawHeight: number;
-    canvasWidth: number;
-    canvasHeight: number;
-    xBounds: Bounds;
-    yBounds: Bounds;
-    scaleX: number;
-    scaleY: number;
-    showMesh: boolean;
-}
-
-function HeightPlotCanvas(props: HeightPlotCanvasProps): JSX.Element {
-    const {
-        curves,
-        drawX,
-        drawY,
-        drawWidth,
-        drawHeight,
-        canvasWidth,
-        canvasHeight,
-        xBounds,
-        yBounds,
-        scaleX,
-        scaleY,
-        showMesh,
-    } = props;
-
     const foreignObject = useRef<SVGForeignObjectElement>(null);
     const [canvas, setCanvas] = useState<HTMLCanvasElement | null>(null);
     const [plotter, setPlotter] = useState<Plotter | null>(null);
+
+    const transformPoint = useTransformPoint();
+    const [scaleX, scaleY] = useScale();
+
+    const { xPaneRange, yPaneRange } = usePaneContext();
+
+    // Clamp pane range to range of valid parameters to height function
+    const xRange = useClampedRange(xPaneRange, [0, totalLengths[0]]);
+    const yRange = useClampedRange(yPaneRange, [0, totalLengths[1]]);
+
+    // Compute dimensions of the visible area, and of the canvas element
+    const { drawX, drawY, drawWidth, drawHeight, canvasWidth, canvasHeight } =
+        useMemo(() => {
+            const drawTopLeft = transformPoint([xRange[0], yRange[1]]);
+            const drawBottomRight = transformPoint([xRange[1], yRange[0]]);
+            const canvasTopLeft = transformPoint([xRange[0], yPaneRange[1]]);
+            const canvasBottomRight = transformPoint([
+                xPaneRange[1],
+                yRange[0],
+            ]);
+
+            return {
+                drawX: drawTopLeft[0],
+                drawY: drawTopLeft[1],
+                drawWidth: drawBottomRight[0] - drawTopLeft[0],
+                drawHeight: drawBottomRight[1] - drawTopLeft[1],
+                canvasWidth: canvasBottomRight[0] - canvasTopLeft[0],
+                canvasHeight: canvasBottomRight[1] - canvasTopLeft[1],
+            };
+        }, [xRange, yRange, xPaneRange, yPaneRange, transformPoint]);
 
     const devicePixelRatio = useDevicePixelRatio();
     const devicePixelRound = (x) =>
         Math.round(x * devicePixelRatio) / devicePixelRatio;
 
+    // Initialize Plotter
     useEffect(() => {
         if (canvas === null) {
             return;
@@ -229,6 +180,7 @@ function HeightPlotCanvas(props: HeightPlotCanvasProps): JSX.Element {
         setPlotter(new Plotter(ctx));
     }, [canvas]);
 
+    // Re-draw canvas
     useLayoutEffect(() => {
         if (plotter === null) {
             return;
@@ -237,8 +189,8 @@ function HeightPlotCanvas(props: HeightPlotCanvasProps): JSX.Element {
         plotter.update_curves(...curves);
         plotter.draw({
             show_mesh: showMesh,
-            x_bounds: xBounds,
-            y_bounds: yBounds,
+            x_bounds: xRange,
+            y_bounds: yRange,
             x_scale: scaleX,
             y_scale: scaleY,
             draw_width: Math.round(drawWidth * devicePixelRatio),
@@ -249,15 +201,15 @@ function HeightPlotCanvas(props: HeightPlotCanvasProps): JSX.Element {
         plotter,
         curves,
         showMesh,
-        xBounds,
-        yBounds,
+        xRange,
+        yRange,
         scaleX,
         scaleY,
         drawWidth,
         drawHeight,
         devicePixelRatio,
 
-        // Also re-render when canvas dimensions change
+        // Also re-draw when canvas dimensions change
         canvasWidth,
         canvasHeight,
     ]);
