@@ -4,7 +4,7 @@ import {
     Mafs,
     MovablePoint,
     Point,
-    Polygon,
+    Polyline,
     Theme,
 } from 'mafs';
 import { type Dispatch, type SetStateAction, useState } from 'react';
@@ -49,9 +49,6 @@ export function CurveSpaceView(props: CurveSpaceViewProps): JSX.Element {
     );
 }
 
-// TODO: Normalize scale across views, so this constant is just 1 and can be removed
-const SCALE = 0.01;
-
 function CurveSpaceViewCanvas(props: CurveSpaceViewCanvasProps): JSX.Element {
     const { width, height, curves, updateCurves, highlightLeash } = props;
 
@@ -59,31 +56,23 @@ function CurveSpaceViewCanvas(props: CurveSpaceViewCanvasProps): JSX.Element {
         <Mafs width={width} height={height} zoom>
             <Coordinates.Cartesian />
             {curves.map((curve, curveIdx) => (
-                <Polygon
+                <Polyline
                     key={curveIdx}
-                    points={curve.points.map(([x, y]) => [
-                        x * SCALE,
-                        y * SCALE,
-                    ])}
-                    shapeType="open"
-                    fillOpacity={0}
+                    points={curve.points}
                     color={curveIdx === 0 ? Theme.blue : Theme.red}
                 />
             ))}
             {curves.map((curve, curveIdx) =>
-                curve.points.map(([x, y], pointIdx) => (
+                curve.points.map((point, pointIdx) => (
                     <MovablePoint
                         key={`${curveIdx}.${pointIdx}`}
-                        point={[x * SCALE, y * SCALE]}
-                        onMove={([x, y]) => {
+                        point={point}
+                        onMove={(newPoint) => {
                             updateCurves((curves) => {
                                 curves = [...curves];
                                 curves[curveIdx] = curves[
                                     curveIdx
-                                ].with_replaced_point(pointIdx, [
-                                    x / SCALE,
-                                    y / SCALE,
-                                ]);
+                                ].with_replaced_point(pointIdx, newPoint);
                                 return curves;
                             });
                         }}
@@ -106,8 +95,8 @@ interface LeashPreviewProps {
 function LeashPreview(props: LeashPreviewProps): JSX.Element {
     const { curves, leash } = props;
     const points = [
-        curves[0].at(leash[0]).map((s) => s * SCALE) as IPoint,
-        curves[1].at(leash[1]).map((s) => s * SCALE) as IPoint,
+        curves[0].at(leash[0]) as IPoint,
+        curves[1].at(leash[1]) as IPoint,
     ];
 
     return (
