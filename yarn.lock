@@ -1387,7 +1387,7 @@ __metadata:
   peerDependencies:
     react: ">=16.8"
     react-dom: ">=16.8"
-  checksum: 4560ae3a9f7c6387a48a4f9a03a6cf805f88f13f85938c2d34f7407393059cefd091770c0bb24f5a21df6afb1c04dad951ecb17ba667959c4e4705e40eb9e570
+  checksum: 966ed8d4e71e3dfee3a88e2d3b2aeec9a219da9d8f1d8299a36315e3ae27dbc263de586c69f321a7271ef1e7661676acee0c663d42458245cb30d23e49cad3ab
   languageName: node
   linkType: hard
 
