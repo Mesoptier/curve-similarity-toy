@@ -8,11 +8,11 @@ export function App(): JSX.Element {
     const [curves, setCurves] = useState<[JsCurve, JsCurve]>([
         new JsCurve([
             [1.98, 1.58],
-            [1.50, 2.48],
+            [1.5, 2.48],
             [0.91, 2.98],
         ]),
         new JsCurve([
-            [3.00, 2.14],
+            [3.0, 2.14],
             [2.64, 3.44],
             [2.27, 3.87],
         ]),
