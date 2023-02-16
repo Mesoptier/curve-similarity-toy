@@ -73,8 +73,10 @@ export type IDrawOptions = {
     show_mesh: boolean;
     x_bounds: [min: number, max: number];
     y_bounds: [min: number, max: number];
-    canvas_width: number;
-    canvas_height: number;
+    x_scale: number;
+    y_scale: number;
+    draw_width: number;
+    draw_height: number;
     device_pixel_ratio: number;
 };
 "#;
@@ -90,8 +92,10 @@ struct DrawOptions {
     show_mesh: bool,
     x_bounds: [f32; 2],
     y_bounds: [f32; 2],
-    canvas_width: i32,
-    canvas_height: i32,
+    x_scale: f32,
+    y_scale: f32,
+    draw_width: i32,
+    draw_height: i32,
     device_pixel_ratio: f32,
 }
 
@@ -151,15 +155,22 @@ impl Plotter {
             show_mesh,
             x_bounds,
             y_bounds,
-            canvas_width,
-            canvas_height,
+            x_scale,
+            y_scale,
+            draw_width,
+            draw_height,
             device_pixel_ratio,
             ..
         } = options;
 
         let context = self.context_with_layers.borrow_context();
 
-        context.viewport(0, 0, canvas_width, canvas_height);
+        context.viewport(
+            0,
+            0,
+            draw_width,
+            draw_height,
+        );
 
         if let Ok(range) = context
             .get_parameter(WebGl2RenderingContext::ALIASED_LINE_WIDTH_RANGE)
@@ -172,16 +183,18 @@ impl Plotter {
             context.line_width(line_width);
         }
 
+        let scale = vector![x_scale, y_scale];
+
         // Build mesh
-        let res = 64.;
+        let res = 64.0; // max pixels per subdivision
         let x_points = subdivide_lengths(
             self.curves[0].cumulative_lengths(),
-            res,
+            res / x_scale,
             x_bounds,
         );
         let y_points = subdivide_lengths(
             self.curves[1].cumulative_lengths(),
-            res,
+            res / y_scale,
             y_bounds,
         );
 
@@ -207,15 +220,17 @@ impl Plotter {
             .map(|w| min_value + (max_value - min_value) * w)
             .collect_vec();
 
-        let isoline_precision = 0.2;
+        let isoline_precision = 0.2; // how many pixels can isolines be off by
 
         let should_refine_triangle = |triangle: [&Vertex<Dist>; 3]| -> bool {
             isoline_thresholds.iter().any(|&threshold_value| {
                 isolines::analyze_triangle(triangle, threshold_value)
                     .map(|[v0, v1]| {
                         let should_refine_vertex = |v: Vertex<Dist>| {
-                            let gradient_magnitude =
-                                gradient_fn.eval(v.point).magnitude();
+                            let gradient_magnitude = gradient_fn
+                                .eval(v.point)
+                                .component_div(&scale)
+                                .magnitude();
                             let true_value = curve_dist_fn.eval(v.point);
                             let error = (v.value - true_value).abs();
                             error > isoline_precision * gradient_magnitude

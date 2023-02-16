@@ -1,21 +1,33 @@
 import {
     type Dispatch,
     type SetStateAction,
+    useCallback,
     useEffect,
+    useLayoutEffect,
     useMemo,
     useRef,
     useState,
 } from 'react';
+import {
+    Coordinates,
+    Interval,
+    Line,
+    Mafs,
+    MovablePoint,
+    Theme,
+    usePaneContext,
+    useTransformContext,
+    vec,
+} from 'mafs';
 
-import { JsCurve, Plotter } from '@rs_lib';
-import { useDrag } from '@use-gesture/react';
+import { ILengths, JsCurve, Plotter } from '@rs_lib';
 
-const CURVE_OFFSET = 20;
-const PLOT_OFFSET = 40;
-const OVERFLOW_OFFSET = 20;
+import { useBoundingClientRect } from '../hooks/useBoundingClientRect';
+import { useDevicePixelRatio } from '../hooks/useDevicePixelRatio';
 
 interface ParamSpaceViewCanvasProps {
-    containerSize: { width: number; height: number };
+    width: number;
+    height: number;
     showMesh: boolean;
 
     curves: [JsCurve, JsCurve];
@@ -28,50 +40,14 @@ type ParamSpaceViewProps = Pick<
     'curves' | 'highlightLeash' | 'setHighlightLeash'
 >;
 
-function makeGridLines(xCoords: number[], yCoords: number[]): string {
-    const xMin = Math.round(xCoords[0]);
-    const xMax = Math.round(xCoords[xCoords.length - 1]);
-    const yMin = Math.round(yCoords[0]);
-    const yMax = Math.round(yCoords[yCoords.length - 1]);
-
-    const verticalLines = xCoords
-        .filter((_, index, array) => index !== 0 && index !== array.length - 1)
-        .map((x) => Math.round(x - 0.5) + 0.5)
-        .map((x) => `M${x} ${yMin}V${yMax}`)
-        .join('');
-    const horizontalLines = yCoords
-        .filter((_, index, array) => index !== 0 && index !== array.length - 1)
-        .map((y) => Math.round(y - 0.5) + 0.5)
-        .map((y) => `M${xMin} ${y}H${xMax}`)
-        .join('');
-    return verticalLines + horizontalLines;
-}
-
 export function ParamSpaceView(props: ParamSpaceViewProps): JSX.Element {
     const { curves, ...otherProps } = props;
 
     const [showMesh, setShowMesh] = useState(false);
 
-    const [container, setContainer] = useState<HTMLElement | null>(null);
-    const [containerSize, setContainerSize] = useState<{
-        width: number;
-        height: number;
-    }>({ width: 0, height: 0 });
-
-    useEffect(() => {
-        if (container === null) {
-            return;
-        }
-
-        const observer = new ResizeObserver((entries) => {
-            const { width, height } = entries[0].contentRect;
-            setContainerSize({ width, height });
-        });
-        observer.observe(container, { box: 'border-box' });
-        return () => {
-            observer.disconnect();
-        };
-    }, [container]);
+    const [containerElement, setContainerElement] =
+        useState<HTMLElement | null>(null);
+    const containerRect = useBoundingClientRect(containerElement);
 
     return (
         <div className="space-view">
@@ -86,308 +62,157 @@ export function ParamSpaceView(props: ParamSpaceViewProps): JSX.Element {
                     Show mesh
                 </label>
             </header>
-            <div ref={setContainer} className="space-view__canvas">
-                {curves.every((curve) => curve.points.length > 1) && (
-                    <ParamSpaceViewCanvas
-                        containerSize={containerSize}
-                        curves={curves}
-                        showMesh={showMesh}
-                        {...otherProps}
-                    />
-                )}
+            <div ref={setContainerElement} className="space-view__canvas">
+                {containerRect &&
+                    curves.every((curve) => curve.points.length > 1) && (
+                        <ParamSpaceViewCanvas
+                            width={containerRect.width}
+                            height={containerRect.height}
+                            curves={curves}
+                            showMesh={showMesh}
+                            {...otherProps}
+                        />
+                    )}
             </div>
         </div>
     );
 }
 
-type Bounds = [min: number, max: number];
-
-function useComputeBounds(
-    cumulativeLengths: number[],
-    offset: number,
-    maxPlotLength: number,
-): Bounds {
-    const totalLength = cumulativeLengths[cumulativeLengths.length - 1];
-    const min = Math.max(0, 0 - offset);
-    const max = Math.min(totalLength, maxPlotLength - offset);
-    const bounds: Bounds = [min, max];
-    return useMemo(() => bounds, bounds);
-}
-
 function ParamSpaceViewCanvas(props: ParamSpaceViewCanvasProps): JSX.Element {
     const {
-        containerSize,
-        showMesh,
+        width,
+        height,
         curves,
+        showMesh,
         highlightLeash,
         setHighlightLeash,
     } = props;
 
-    const [cumulativeLengths1, cumulativeLengths2] = curves.map(
+    const cumulativeLengths = curves.map(
         (curve) => curve.cumulative_lengths,
-    );
+    ) as [ILengths, ILengths];
+    const totalLengths = cumulativeLengths.map(
+        (lengths) => lengths[lengths.length - 1],
+    ) as [number, number];
 
-    const maxPlotWidth = Math.max(
-        0,
-        containerSize.width - (PLOT_OFFSET + CURVE_OFFSET),
-    );
-    const maxPlotHeight = Math.max(
-        0,
-        containerSize.height - (PLOT_OFFSET + CURVE_OFFSET),
-    );
-
-    const [isDragging, setDragging] = useState(false);
-    const [[xOffset, yOffset], setTranslation] = useState([0, 0]);
-
-    const targetRef = useRef(null);
-
-    useDrag(
-        (state) => {
-            const [xOffset, yOffset] = state.offset;
-            setTranslation([xOffset, -yOffset]);
-            setDragging(state.dragging);
-
-            if (state.dragging) {
-                setHighlightLeash(null);
-            }
-        },
-        { target: targetRef },
-    );
-
-    const xBounds = useComputeBounds(cumulativeLengths1, xOffset, maxPlotWidth);
-    const yBounds = useComputeBounds(
-        cumulativeLengths2,
-        yOffset,
-        maxPlotHeight,
-    );
-
-    const plotWidth = xBounds[1] - xBounds[0];
-    const plotHeight = yBounds[1] - yBounds[0];
+    const setHighlightLeashClamped = (point) => {
+        setHighlightLeash([
+            Math.max(0, Math.min(totalLengths[0], point[0])),
+            Math.max(0, Math.min(totalLengths[1], point[1])),
+        ]);
+    };
 
     return (
-        <svg ref={targetRef} style={{ touchAction: 'none' }}>
-            <g transform={`translate(0, ${containerSize.height}) scale(1, -1)`}>
-                {/* Flattened curves along axes */}
-                <g
-                    className="curve"
-                    data-curve-idx={0}
-                    transform={`translate(${PLOT_OFFSET}, ${CURVE_OFFSET})`}
-                >
-                    <CurveAxis
-                        cumulativeLengths={cumulativeLengths1}
-                        offset={xOffset}
-                        maxLength={maxPlotWidth}
+        <Mafs
+            width={width}
+            height={height}
+            zoom
+            onClick={(point) => setHighlightLeashClamped(point)}
+        >
+            <Coordinates.Cartesian />
+            <HeightPlot
+                curves={curves}
+                totalLengths={totalLengths}
+                showMesh={showMesh}
+            />
+            {highlightLeash && (
+                <>
+                    <Line.Segment
+                        point1={[0, highlightLeash[1]]}
+                        point2={highlightLeash}
+                        color={Theme.pink}
                     />
-                </g>
-                <g
-                    className="curve"
-                    data-curve-idx={1}
-                    transform={`translate(${CURVE_OFFSET}, ${PLOT_OFFSET}) rotate(90)`}
-                >
-                    <CurveAxis
-                        cumulativeLengths={cumulativeLengths2}
-                        offset={yOffset}
-                        maxLength={maxPlotHeight}
+                    <Line.Segment
+                        point1={[highlightLeash[0], 0]}
+                        point2={highlightLeash}
+                        color={Theme.pink}
                     />
-                </g>
-
-                {/* Plot canvas */}
-                <foreignObject
-                    className="plot-canvas"
-                    x={PLOT_OFFSET + Math.max(0, xOffset)}
-                    y={PLOT_OFFSET + Math.max(0, yOffset)}
-                    width={Math.round(plotWidth)}
-                    height={Math.round(plotHeight)}
-                    onMouseMove={(e) => {
-                        if (isDragging) {
-                            return;
-                        }
-
-                        const { x, y, height } =
-                            e.currentTarget.getBoundingClientRect();
-
-                        setHighlightLeash([
-                            e.clientX - x - Math.min(0, xOffset),
-                            height - (e.clientY - y) - Math.min(0, yOffset),
-                        ]);
-                    }}
-                    onMouseLeave={() => {
-                        setHighlightLeash(null);
-                    }}
-                >
-                    <Plot
-                        curves={curves}
-                        width={Math.round(plotWidth)}
-                        height={Math.round(plotHeight)}
-                        xBounds={xBounds}
-                        yBounds={yBounds}
-                        showMesh={showMesh}
+                    <MovablePoint
+                        color={Theme.pink}
+                        point={highlightLeash}
+                        onMove={(point) => setHighlightLeashClamped(point)}
                     />
-                </foreignObject>
-
-                {/* Plot overlay */}
-                <g
-                    className="plot-overlay"
-                    transform={`translate(${PLOT_OFFSET}, ${PLOT_OFFSET})`}
-                >
-                    <path
-                        className="grid-lines"
-                        d={makeGridLines(
-                            cumulativeLengths1.map(
-                                (length) =>
-                                    Math.max(
-                                        xBounds[0],
-                                        Math.min(xBounds[1], length),
-                                    ) + xOffset,
-                            ),
-                            cumulativeLengths2.map(
-                                (length) =>
-                                    Math.max(
-                                        yBounds[0],
-                                        Math.min(yBounds[1], length),
-                                    ) + yOffset,
-                            ),
-                        )}
-                    />
-                    {!isDragging && highlightLeash && (
-                        <g className="leash">
-                            <line
-                                className="leash__line leash__line--dashed"
-                                x1={-(PLOT_OFFSET - CURVE_OFFSET)}
-                                y1={highlightLeash[1] + yOffset}
-                                x2={highlightLeash[0] + xOffset}
-                                y2={highlightLeash[1] + yOffset}
-                            />
-                            <line
-                                className="leash__line leash__line--dashed"
-                                x1={highlightLeash[0] + xOffset}
-                                y1={-(PLOT_OFFSET - CURVE_OFFSET)}
-                                x2={highlightLeash[0] + xOffset}
-                                y2={highlightLeash[1] + yOffset}
-                            />
-                            <circle
-                                className="leash__point"
-                                cx={highlightLeash[0] + xOffset}
-                                cy={highlightLeash[1] + yOffset}
-                            />
-                            <circle
-                                className="leash__point"
-                                cx={-(PLOT_OFFSET - CURVE_OFFSET)}
-                                cy={highlightLeash[1] + yOffset}
-                            />
-                            <circle
-                                className="leash__point"
-                                cx={highlightLeash[0] + xOffset}
-                                cy={-(PLOT_OFFSET - CURVE_OFFSET)}
-                            />
-                        </g>
-                    )}
-                </g>
-            </g>
-        </svg>
+                </>
+            )}
+        </Mafs>
     );
 }
 
-interface CurveAxisProps {
-    cumulativeLengths: number[];
-    offset: number;
-    maxLength: number;
+function useClampedRange(range: Interval, clamp: Interval): Interval {
+    const clampedRange: Interval = [
+        Math.max(range[0], clamp[0]),
+        Math.min(range[1], clamp[1]),
+    ];
+    return useMemo(() => clampedRange, clampedRange);
 }
 
-function CurveAxis(props: CurveAxisProps): JSX.Element {
-    const { cumulativeLengths, offset, maxLength } = props;
-    const totalLength = cumulativeLengths[cumulativeLengths.length - 1];
+function useScale(): vec.Vector2 {
+    const { userTransform, viewTransform } = useTransformContext();
+    const scale: vec.Vector2 = [
+        Math.abs(viewTransform[0]) * Math.abs(userTransform[0]),
+        Math.abs(viewTransform[4]) * Math.abs(userTransform[4]),
+    ];
+    return useMemo(() => scale, scale);
+}
 
-    return (
-        <>
-            <line
-                className="curve__line curve__line--overflow"
-                x1={Math.max(offset, 0)}
-                x2={Math.max(offset, 0 - OVERFLOW_OFFSET)}
-                y1={0}
-                y2={0}
-            />
-            <line
-                className="curve__line"
-                x1={Math.max(offset, 0)}
-                x2={Math.min(offset + totalLength, maxLength)}
-                y1={0}
-                y2={0}
-            />
-            <line
-                className="curve__line curve__line--overflow"
-                x1={Math.min(offset + totalLength, maxLength)}
-                x2={Math.min(offset + totalLength, maxLength + OVERFLOW_OFFSET)}
-                y1={0}
-                y2={0}
-            />
-            {cumulativeLengths
-                .map((length) => offset + length)
-                .filter(
-                    (length) =>
-                        0 - OVERFLOW_OFFSET <= length &&
-                        length <= maxLength + OVERFLOW_OFFSET,
-                )
-                .map((length, idx) => {
-                    let scale = 1;
-                    if (length <= 0) {
-                        scale = 1 - (0 - length) / OVERFLOW_OFFSET;
-                    } else if (maxLength <= length) {
-                        scale = 1 - (length - maxLength) / OVERFLOW_OFFSET;
-                    }
-                    return (
-                        <circle
-                            key={idx}
-                            className="curve__point"
-                            cx={length}
-                            cy={0}
-                            style={{ '--scale': scale }}
-                        />
-                    );
-                })}
-        </>
+function useTransformPoint(): (point: vec.Vector2) => vec.Vector2 {
+    const { userTransform, viewTransform } = useTransformContext();
+    return useCallback(
+        (point: vec.Vector2) =>
+            vec.transform(vec.transform(point, userTransform), viewTransform),
+        [userTransform, viewTransform],
     );
 }
 
-function useDevicePixelRatio(): number {
-    const [devicePixelRatio, setDevicePixelRatio] = useState(
-        window.devicePixelRatio,
-    );
-    useEffect(() => {
-        const media = window.matchMedia(
-            `(resolution: ${devicePixelRatio}dppx)`,
-        );
-        const handleChange = () => {
-            setDevicePixelRatio(window.devicePixelRatio);
-        };
-
-        media.addEventListener('change', handleChange);
-        return () => {
-            media.removeEventListener('change', handleChange);
-        };
-    }, [devicePixelRatio]);
-    return devicePixelRatio;
-}
-
-interface PlotProps {
+interface HeightPlotProps {
     curves: [JsCurve, JsCurve];
-    width: number;
-    height: number;
-    xBounds: Bounds;
-    yBounds: Bounds;
+    totalLengths: [number, number];
     showMesh: boolean;
 }
 
-function Plot(props: PlotProps): JSX.Element {
-    const { curves, height, width, xBounds, yBounds, showMesh } = props;
+function HeightPlot(props: HeightPlotProps) {
+    const { curves, totalLengths, showMesh } = props;
 
+    const foreignObject = useRef<SVGForeignObjectElement>(null);
     const [canvas, setCanvas] = useState<HTMLCanvasElement | null>(null);
     const [plotter, setPlotter] = useState<Plotter | null>(null);
 
-    const devicePixelRatio = useDevicePixelRatio();
-    const canvasWidth = Math.round(width * devicePixelRatio);
-    const canvasHeight = Math.round(height * devicePixelRatio);
+    const transformPoint = useTransformPoint();
+    const [scaleX, scaleY] = useScale();
 
+    const { xPaneRange, yPaneRange } = usePaneContext();
+
+    // Clamp pane range to range of valid parameters to height function
+    const xRange = useClampedRange(xPaneRange, [0, totalLengths[0]]);
+    const yRange = useClampedRange(yPaneRange, [0, totalLengths[1]]);
+
+    // Compute dimensions of the visible area, and of the canvas element
+    const { drawX, drawY, drawWidth, drawHeight, canvasWidth, canvasHeight } =
+        useMemo(() => {
+            const drawTopLeft = transformPoint([xRange[0], yRange[1]]);
+            const drawBottomRight = transformPoint([xRange[1], yRange[0]]);
+            const canvasTopLeft = transformPoint([xRange[0], yPaneRange[1]]);
+            const canvasBottomRight = transformPoint([
+                xPaneRange[1],
+                yRange[0],
+            ]);
+
+            const clamp = (x) => Math.max(0, x);
+            return {
+                drawX: drawTopLeft[0],
+                drawY: drawTopLeft[1],
+                drawWidth: clamp(drawBottomRight[0] - drawTopLeft[0]),
+                drawHeight: clamp(drawBottomRight[1] - drawTopLeft[1]),
+                canvasWidth: clamp(canvasBottomRight[0] - canvasTopLeft[0]),
+                canvasHeight: clamp(canvasBottomRight[1] - canvasTopLeft[1]),
+            };
+        }, [xRange, yRange, xPaneRange, yPaneRange, transformPoint]);
+
+    const devicePixelRatio = useDevicePixelRatio();
+    const devicePixelRound = (x) =>
+        Math.round(x * devicePixelRatio) / devicePixelRatio;
+
+    // Initialize Plotter
     useEffect(() => {
         if (canvas === null) {
             return;
@@ -397,42 +222,80 @@ function Plot(props: PlotProps): JSX.Element {
         setPlotter(new Plotter(ctx));
     }, [canvas]);
 
-    useEffect(() => {
+    // Re-draw canvas
+    useLayoutEffect(() => {
         if (plotter === null) {
+            return;
+        }
+        if (drawWidth === 0 || drawHeight === 0) {
             return;
         }
 
         plotter.update_curves(...curves);
         plotter.draw({
             show_mesh: showMesh,
-            x_bounds: xBounds,
-            y_bounds: yBounds,
-            canvas_width: canvasWidth,
-            canvas_height: canvasHeight,
+            x_bounds: xRange,
+            y_bounds: yRange,
+            x_scale: scaleX,
+            y_scale: scaleY,
+            draw_width: Math.round(drawWidth * devicePixelRatio),
+            draw_height: Math.round(drawHeight * devicePixelRatio),
             device_pixel_ratio: devicePixelRatio,
         });
     }, [
         plotter,
         curves,
         showMesh,
-        xBounds,
-        yBounds,
+        xRange,
+        yRange,
+        scaleX,
+        scaleY,
+        drawWidth,
+        drawHeight,
+        devicePixelRatio,
+
+        // Also re-draw when canvas dimensions change
         canvasWidth,
         canvasHeight,
-        devicePixelRatio,
     ]);
 
+    useLayoutEffect(() => {
+        // Transform the foreignObject such that it aligns perfectly to the
+        // device pixel grid.
+        const rect = foreignObject.current.closest('svg').viewBox.animVal;
+        const [offsetX, offsetY] = !rect
+            ? [0, 0]
+            : [
+                  rect.x - devicePixelRound(rect.x),
+                  rect.y - devicePixelRound(rect.y),
+              ];
+        foreignObject.current.setAttribute(
+            'transform',
+            `translate(${offsetX}, ${offsetY})`,
+        );
+    });
+
     return (
-        <canvas
-            ref={setCanvas}
-            width={canvasWidth}
-            height={canvasHeight}
-            style={{
-                width: `${width}px`,
-                height: `${height}px`,
-                transform: 'scale(1, -1)',
-                transformOrigin: '50% 50%',
-            }}
-        />
+        <foreignObject
+            ref={foreignObject}
+            x={devicePixelRound(drawX)}
+            y={devicePixelRound(drawY)}
+            width={devicePixelRound(drawWidth)}
+            height={devicePixelRound(drawHeight)}
+        >
+            <canvas
+                ref={setCanvas}
+                width={Math.round(canvasWidth * devicePixelRatio)}
+                height={Math.round(canvasHeight * devicePixelRatio)}
+                style={{
+                    width: devicePixelRound(canvasWidth),
+                    height: devicePixelRound(canvasHeight),
+
+                    position: 'absolute',
+                    bottom: 0,
+                    left: 0,
+                }}
+            />
+        </foreignObject>
     );
 }
