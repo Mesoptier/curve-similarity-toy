@@ -217,6 +217,8 @@ function HeightPlotCanvas(props: HeightPlotCanvasProps): JSX.Element {
     const [plotter, setPlotter] = useState<Plotter | null>(null);
 
     const devicePixelRatio = useDevicePixelRatio();
+    const devicePixelRound = (x) =>
+        Math.round(x * devicePixelRatio) / devicePixelRatio;
 
     useEffect(() => {
         if (canvas === null) {
@@ -232,15 +234,6 @@ function HeightPlotCanvas(props: HeightPlotCanvasProps): JSX.Element {
             return;
         }
 
-        const scaledDrawWidth = Math.round(drawWidth * devicePixelRatio);
-        const scaledDrawHeight = Math.round(drawHeight * devicePixelRatio);
-
-        const scaledCanvasWidth = Math.round(canvasWidth * devicePixelRatio);
-        const scaledCanvasHeight = Math.round(canvasHeight * devicePixelRatio);
-
-        canvas.width = scaledCanvasWidth;
-        canvas.height = scaledCanvasHeight;
-
         plotter.update_curves(...curves);
         plotter.draw({
             show_mesh: showMesh,
@@ -248,40 +241,60 @@ function HeightPlotCanvas(props: HeightPlotCanvasProps): JSX.Element {
             y_bounds: yBounds,
             x_scale: scaleX,
             y_scale: scaleY,
-            draw_width: scaledDrawWidth,
-            draw_height: scaledDrawHeight,
-            canvas_width: scaledCanvasWidth,
-            canvas_height: scaledCanvasHeight,
+            draw_width: Math.round(drawWidth * devicePixelRatio),
+            draw_height: Math.round(drawHeight * devicePixelRatio),
+            canvas_width: Math.round(canvasWidth * devicePixelRatio),
+            canvas_height: Math.round(canvasHeight * devicePixelRatio),
             device_pixel_ratio: devicePixelRatio,
         });
-
-        foreignObject.current.setAttribute('x', `${drawX}`);
-        foreignObject.current.setAttribute('y', `${drawY}`);
-        foreignObject.current.setAttribute('width', `${drawWidth}`);
-        foreignObject.current.setAttribute('height', `${drawHeight}`);
-
-        canvas.style.width = `${canvasWidth}px`;
-        canvas.style.height = `${canvasHeight}px`;
     }, [
         plotter,
         curves,
         showMesh,
         xBounds,
         yBounds,
-        drawX,
-        drawY,
+        scaleX,
+        scaleY,
         drawWidth,
         drawHeight,
         canvasWidth,
         canvasHeight,
-        scaleX,
-        scaleY,
         devicePixelRatio,
     ]);
 
+    useLayoutEffect(() => {
+        // Transform the foreignObject such that it aligns perfectly to the
+        // device pixel grid.
+        const rect = foreignObject.current.closest('svg').viewBox.animVal;
+        const [offsetX, offsetY] = !rect
+            ? [0, 0]
+            : [
+                  rect.x - devicePixelRound(rect.x),
+                  rect.y - devicePixelRound(rect.y),
+              ];
+        foreignObject.current.setAttribute(
+            'transform',
+            `translate(${offsetX}, ${offsetY})`,
+        );
+    });
+
     return (
-        <foreignObject ref={foreignObject}>
-            <canvas ref={setCanvas} />
+        <foreignObject
+            ref={foreignObject}
+            x={devicePixelRound(drawX)}
+            y={devicePixelRound(drawY)}
+            width={devicePixelRound(drawWidth)}
+            height={devicePixelRound(drawHeight)}
+        >
+            <canvas
+                ref={setCanvas}
+                width={Math.round(canvasWidth * devicePixelRatio)}
+                height={Math.round(canvasHeight * devicePixelRatio)}
+                style={{
+                    width: devicePixelRound(canvasWidth),
+                    height: devicePixelRound(canvasHeight),
+                }}
+            />
         </foreignObject>
     );
 }
