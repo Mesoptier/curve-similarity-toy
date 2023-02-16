@@ -107,6 +107,9 @@ function HeightPlot(props: HeightPlotProps) {
 
     const { userTransform, viewTransform } = useTransformContext();
 
+    const scaleX = Math.abs(viewTransform[0]) * Math.abs(userTransform[0]);
+    const scaleY = Math.abs(viewTransform[4]) * Math.abs(userTransform[4]);
+
     const { xPaneRange, yPaneRange } = usePaneContext();
     const xRangeUnmemoized = [
         Math.max(0, xPaneRange[0]),
@@ -151,6 +154,8 @@ function HeightPlot(props: HeightPlotProps) {
             canvasHeight={canvasHeight}
             xBounds={xRange}
             yBounds={yRange}
+            scaleX={scaleX}
+            scaleY={scaleY}
             showMesh={showMesh}
         />
     );
@@ -186,6 +191,8 @@ interface HeightPlotCanvasProps {
     canvasHeight: number;
     xBounds: Bounds;
     yBounds: Bounds;
+    scaleX: number;
+    scaleY: number;
     showMesh: boolean;
 }
 
@@ -200,6 +207,8 @@ function HeightPlotCanvas(props: HeightPlotCanvasProps): JSX.Element {
         canvasHeight,
         xBounds,
         yBounds,
+        scaleX,
+        scaleY,
         showMesh,
     } = props;
 
@@ -237,6 +246,8 @@ function HeightPlotCanvas(props: HeightPlotCanvasProps): JSX.Element {
             show_mesh: showMesh,
             x_bounds: xBounds,
             y_bounds: yBounds,
+            x_scale: scaleX,
+            y_scale: scaleY,
             draw_width: scaledDrawWidth,
             draw_height: scaledDrawHeight,
             canvas_width: scaledCanvasWidth,
@@ -263,6 +274,8 @@ function HeightPlotCanvas(props: HeightPlotCanvasProps): JSX.Element {
         drawHeight,
         canvasWidth,
         canvasHeight,
+        scaleX,
+        scaleY,
         devicePixelRatio,
     ]);
 
