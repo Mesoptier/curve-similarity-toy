@@ -243,8 +243,6 @@ function HeightPlotCanvas(props: HeightPlotCanvasProps): JSX.Element {
             y_scale: scaleY,
             draw_width: Math.round(drawWidth * devicePixelRatio),
             draw_height: Math.round(drawHeight * devicePixelRatio),
-            canvas_width: Math.round(canvasWidth * devicePixelRatio),
-            canvas_height: Math.round(canvasHeight * devicePixelRatio),
             device_pixel_ratio: devicePixelRatio,
         });
     }, [
@@ -257,9 +255,11 @@ function HeightPlotCanvas(props: HeightPlotCanvasProps): JSX.Element {
         scaleY,
         drawWidth,
         drawHeight,
+        devicePixelRatio,
+
+        // Also re-render when canvas dimensions change
         canvasWidth,
         canvasHeight,
-        devicePixelRatio,
     ]);
 
     useLayoutEffect(() => {
@@ -293,6 +293,10 @@ function HeightPlotCanvas(props: HeightPlotCanvasProps): JSX.Element {
                 style={{
                     width: devicePixelRound(canvasWidth),
                     height: devicePixelRound(canvasHeight),
+
+                    position: 'absolute',
+                    bottom: 0,
+                    left: 0,
                 }}
             />
         </foreignObject>

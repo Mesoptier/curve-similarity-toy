@@ -77,8 +77,6 @@ export type IDrawOptions = {
     y_scale: number;
     draw_width: number;
     draw_height: number;
-    canvas_width: number;
-    canvas_height: number;
     device_pixel_ratio: number;
 };
 "#;
@@ -98,8 +96,6 @@ struct DrawOptions {
     y_scale: f32,
     draw_width: i32,
     draw_height: i32,
-    canvas_width: i32,
-    canvas_height: i32,
     device_pixel_ratio: f32,
 }
 
@@ -163,8 +159,6 @@ impl Plotter {
             y_scale,
             draw_width,
             draw_height,
-            canvas_width,
-            canvas_height,
             device_pixel_ratio,
             ..
         } = options;
@@ -173,7 +167,7 @@ impl Plotter {
 
         context.viewport(
             0,
-            canvas_height - draw_height,
+            0,
             draw_width,
             draw_height,
         );
