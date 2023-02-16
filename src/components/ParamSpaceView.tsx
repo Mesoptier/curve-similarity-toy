@@ -156,13 +156,14 @@ function HeightPlot(props: HeightPlotProps) {
                 yRange[0],
             ]);
 
+            const clamp = (x) => Math.max(0, x);
             return {
                 drawX: drawTopLeft[0],
                 drawY: drawTopLeft[1],
-                drawWidth: drawBottomRight[0] - drawTopLeft[0],
-                drawHeight: drawBottomRight[1] - drawTopLeft[1],
-                canvasWidth: canvasBottomRight[0] - canvasTopLeft[0],
-                canvasHeight: canvasBottomRight[1] - canvasTopLeft[1],
+                drawWidth: clamp(drawBottomRight[0] - drawTopLeft[0]),
+                drawHeight: clamp(drawBottomRight[1] - drawTopLeft[1]),
+                canvasWidth: clamp(canvasBottomRight[0] - canvasTopLeft[0]),
+                canvasHeight: clamp(canvasBottomRight[1] - canvasTopLeft[1]),
             };
         }, [xRange, yRange, xPaneRange, yPaneRange, transformPoint]);
 
@@ -183,6 +184,9 @@ function HeightPlot(props: HeightPlotProps) {
     // Re-draw canvas
     useLayoutEffect(() => {
         if (plotter === null) {
+            return;
+        }
+        if (drawWidth === 0 || drawHeight === 0) {
             return;
         }
 
